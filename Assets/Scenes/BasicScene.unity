@@ -383,7 +383,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::FingerPaint.VoiceBrushController
   _analyzer: {fileID: 1774160851}
-  _activeProfile: {fileID: 11400000, guid: 210d39410ecae6a4bb3141926099f2d9, type: 2}
+  _activeProfile: {fileID: 11400000, guid: 5fe85d10d62e64c4ba6214bea386668c, type: 2}
 --- !u!4 &939847540
 Transform:
   m_ObjectHideFlags: 0
@@ -412,7 +412,6 @@ GameObject:
   - component: {fileID: 1128206443}
   - component: {fileID: 1128206442}
   - component: {fileID: 1128206441}
-  - component: {fileID: 1128206446}
   - component: {fileID: 1128206447}
   m_Layer: 0
   m_Name: FingerPaintSystem
@@ -525,24 +524,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &1128206446
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1128206440}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 4a306952c3585624e813cf4354921a64, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::FingerPaint.VoiceDebugUI
-  _voiceDetector: {fileID: 1774160849}
-  _distance: 0.6
-  _verticalOffset: -0.2
-  _panelWidth: 0.28
-  _panelHeight: 0.1
-  _barHeight: 0.018
 --- !u!114 &1128206447
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -811,6 +792,7 @@ GameObject:
   - component: {fileID: 1774160850}
   - component: {fileID: 1774160849}
   - component: {fileID: 1774160851}
+  - component: {fileID: 1774160852}
   m_Layer: 0
   m_Name: VoiceDetector
   m_TagString: Untagged
@@ -894,6 +876,24 @@ MonoBehaviour:
   _pitchMaxHz: 600
   _smoothingFactor: 0.2
   _analyzeEveryNFrames: 1
+--- !u!114 &1774160852
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1774160848}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4a306952c3585624e813cf4354921a64, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::FingerPaint.VoiceDebugUI
+  _voiceDetector: {fileID: 1774160849}
+  _distance: 0.6
+  _verticalOffset: -0.2
+  _panelWidth: 0.28
+  _panelHeight: 0.1
+  _barHeight: 0.018
 --- !u!1 &2092139007
 GameObject:
   m_ObjectHideFlags: 0

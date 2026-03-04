@@ -15,7 +15,7 @@ MonoBehaviour:
   BaseColor: {r: 1, g: 0.35, b: 0.15, a: 1}
   BaseEmissionColor: {r: 1, g: 0.4, b: 0.2, a: 1}
   BaseEmissionIntensity: 0.3
-  BaseOpacity: 0.6
+  BaseOpacity: 0.242
   BaseSizeMultiplier: 5
   BaseMeshIndex: 0
   BaseFresnelScale: 0.6
@@ -75,8 +75,8 @@ MonoBehaviour:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    OutputMin: 0.6
-    OutputMax: 2.5
+    OutputMin: 0.2
+    OutputMax: 8.22
     Influence: 1
   - Source: 0
     Target: 3
