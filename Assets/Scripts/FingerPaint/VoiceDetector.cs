@@ -11,6 +11,7 @@ namespace FingerPaint
     /// (e.g. FingerPainter) can use as a drawing trigger.
     /// Louder voice → larger size multiplier for paint spheres.
     /// </summary>
+    [DefaultExecutionOrder(-30)]
     public class VoiceDetector : MonoBehaviour
     {
         // ─── Public read-only state ──────────────────────────────────────
@@ -41,6 +42,9 @@ namespace FingerPaint
 
         /// <summary>Current deactivation threshold (for debug display).</summary>
         public float DeactivationThreshold => _deactivationThreshold;
+
+        /// <summary>The configured sample rate in Hz. Used by VoiceAnalyzer.</summary>
+        public int SampleRate => _sampleRate;
 
         // ─── Configuration ───────────────────────────────────────────────
 
@@ -80,6 +84,7 @@ namespace FingerPaint
 
         private bool _permissionGranted;
         private bool _permissionRequested;
+        private int  _lastReadCount;
 
         // ─── Lifecycle ───────────────────────────────────────────────────
 
@@ -264,6 +269,28 @@ namespace FingerPaint
             }
 
             RawVolume = Mathf.Sqrt(sumSquares / samplesToRead);
+            _lastReadCount = samplesToRead;
+        }
+
+        /// <summary>
+        /// Provides read access to the most recent mic samples for spectral analysis.
+        /// The returned array is owned by VoiceDetector — do NOT hold a reference.
+        /// </summary>
+        /// <param name="buffer">The internal sample buffer (read-only).</param>
+        /// <param name="sampleCount">Number of valid samples in the buffer.</param>
+        /// <returns>True if valid data is available.</returns>
+        public bool GetAnalysisBuffer(out float[] buffer, out int sampleCount)
+        {
+            if (_sampleBuffer == null || !IsMicrophoneAvailable)
+            {
+                buffer = null;
+                sampleCount = 0;
+                return false;
+            }
+
+            buffer = _sampleBuffer;
+            sampleCount = _lastReadCount;
+            return sampleCount > 0;
         }
 
         private void UpdateSmoothedVolume()

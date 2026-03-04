@@ -31,6 +31,13 @@ namespace FingerPaint
         [Tooltip("Required when Trigger Mode is Voice or Combined.")]
         [SerializeField] private VoiceDetector _voiceDetector;
 
+        [Header("Voice Brush (Optional)")]
+        [Tooltip("If set, voice spectral features drive per-spawn visual variation.")]
+        [SerializeField] private VoiceBrushController _voiceBrush;
+
+        [Tooltip("Procedural mesh library for voice-driven shape variation.")]
+        [SerializeField] private BrushMeshLibrary _meshLibrary;
+
         [Header("Painting Settings")]
         [SerializeField] private float _minDistance = 0.005f; // 5mm between points
         [SerializeField] private float _sphereRadius = 0.004f; // 4mm sphere radius
@@ -71,6 +78,15 @@ namespace FingerPaint
         private Material[] _fingerMaterials;
         private Mesh _sharedSphereMesh;
 
+        // ─── MaterialPropertyBlock for voice brush per-spawn overrides ──
+        private MaterialPropertyBlock _propBlock;
+
+        private static readonly int _idBaseColor         = Shader.PropertyToID("_BaseColor");
+        private static readonly int _idOpacity           = Shader.PropertyToID("_Opacity");
+        private static readonly int _idEmissionColor     = Shader.PropertyToID("_EmissionColor");
+        private static readonly int _idEmissionIntensity = Shader.PropertyToID("_EmissionIntensity");
+        private static readonly int _idFresnelScale      = Shader.PropertyToID("_FresnelScale");
+
         // ─── Lifecycle ───────────────────────────────────────────────────
 
         private void Awake()
@@ -83,6 +99,8 @@ namespace FingerPaint
                 PointsByFinger[i] = new List<GameObject>();
                 _lastSpawnPos[i] = Vector3.positiveInfinity;
             }
+
+            _propBlock = new MaterialPropertyBlock();
 
             BuildSharedMesh();
             BuildMaterials();
@@ -156,22 +174,54 @@ namespace FingerPaint
             go.transform.SetParent(transform, false);
             go.transform.position = worldPos;
 
-            // Base size, optionally scaled by voice volume
-            float sizeMultiplier = 1f;
-            if (_voiceDetector != null
-                && (_triggerMode == DrawTriggerMode.Voice
-                    || _triggerMode == DrawTriggerMode.Combined))
+            // ── Resolve size, mesh, and per-instance visuals ───────────
+            bool useVoiceBrush = _voiceBrush != null && _voiceBrush.CurrentBrush.IsValid;
+            BrushState brush = useVoiceBrush ? _voiceBrush.CurrentBrush : default;
+
+            // Size: voice brush overrides VoiceDetector's simple volume scaling
+            float sizeMultiplier;
+            if (useVoiceBrush)
+            {
+                sizeMultiplier = brush.SizeMultiplier;
+            }
+            else if (_voiceDetector != null
+                     && (_triggerMode == DrawTriggerMode.Voice
+                         || _triggerMode == DrawTriggerMode.Combined))
             {
                 sizeMultiplier = _voiceDetector.GetSizeMultiplier();
+            }
+            else
+            {
+                sizeMultiplier = 1f;
             }
 
             go.transform.localScale = Vector3.one * (_sphereRadius * 2f * sizeMultiplier);
 
+            // Mesh: voice brush can select from the mesh library
             var mf = go.AddComponent<MeshFilter>();
-            mf.sharedMesh = _sharedSphereMesh;
+            if (useVoiceBrush && _meshLibrary != null && _meshLibrary.MeshCount > 0)
+            {
+                mf.sharedMesh = _meshLibrary.GetMesh(brush.MeshIndex);
+            }
+            else
+            {
+                mf.sharedMesh = _sharedSphereMesh;
+            }
 
             var mr = go.AddComponent<MeshRenderer>();
             mr.sharedMaterial = _fingerMaterials[fingerIndex];
+
+            // Per-instance MaterialPropertyBlock overrides (no new Material alloc)
+            if (useVoiceBrush)
+            {
+                _propBlock.Clear();
+                _propBlock.SetColor(_idBaseColor,         brush.BaseColor);
+                _propBlock.SetFloat(_idOpacity,           brush.Opacity);
+                _propBlock.SetColor(_idEmissionColor,     brush.EmissionColor);
+                _propBlock.SetFloat(_idEmissionIntensity, brush.EmissionIntensity);
+                _propBlock.SetFloat(_idFresnelScale,      brush.FresnelScale);
+                mr.SetPropertyBlock(_propBlock);
+            }
 
             PointsByFinger[fingerIndex].Add(go);
         }
@@ -218,7 +268,14 @@ namespace FingerPaint
 
         private void BuildSharedMesh()
         {
-            // Generate a low-poly icosphere-ish UV sphere for paint dots
+            // Prefer the BrushMeshLibrary's low-poly sphere if available
+            if (_meshLibrary != null && _meshLibrary.MeshCount > 0)
+            {
+                _sharedSphereMesh = _meshLibrary.GetMesh(BrushMeshLibrary.SPHERE);
+                return;
+            }
+
+            // Fallback: use Unity's built-in sphere mesh
             var temp = GameObject.CreatePrimitive(PrimitiveType.Sphere);
             _sharedSphereMesh = temp.GetComponent<MeshFilter>().sharedMesh;
             Destroy(temp);

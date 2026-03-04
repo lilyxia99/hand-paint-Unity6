@@ -353,6 +353,52 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &939847538
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 939847540}
+  - component: {fileID: 939847539}
+  m_Layer: 0
+  m_Name: VoiceBrushController
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &939847539
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 939847538}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 02140e443c91aee479725630dd9f14af, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::FingerPaint.VoiceBrushController
+  _analyzer: {fileID: 1774160851}
+  _activeProfile: {fileID: 11400000, guid: 210d39410ecae6a4bb3141926099f2d9, type: 2}
+--- !u!4 &939847540
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 939847538}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -3.80799, y: -0, z: 29.57079}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1128206440
 GameObject:
   m_ObjectHideFlags: 0
@@ -367,6 +413,7 @@ GameObject:
   - component: {fileID: 1128206442}
   - component: {fileID: 1128206441}
   - component: {fileID: 1128206446}
+  - component: {fileID: 1128206447}
   m_Layer: 0
   m_Name: FingerPaintSystem
   m_TagString: Untagged
@@ -422,6 +469,8 @@ MonoBehaviour:
   _handTracking: {fileID: 1128206444}
   _triggerMode: 1
   _voiceDetector: {fileID: 1774160849}
+  _voiceBrush: {fileID: 939847539}
+  _meshLibrary: {fileID: 1373866106}
   _minDistance: 0.005
   _sphereRadius: 0.004
   _sphereSegments: 6
@@ -494,6 +543,20 @@ MonoBehaviour:
   _panelWidth: 0.28
   _panelHeight: 0.1
   _barHeight: 0.018
+--- !u!114 &1128206447
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1128206440}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2c5a11e5efdfc484685eb1366196a651, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::FingerPaint.BrushMeshLibrary
+  _sphereRings: 6
+  _sphereSlices: 12
 --- !u!1 &1249617917
 GameObject:
   m_ObjectHideFlags: 0
@@ -691,6 +754,52 @@ MonoBehaviour:
   m_Teleporting:
     m_PersistentCalls:
       m_Calls: []
+--- !u!1 &1373866105
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1373866107}
+  - component: {fileID: 1373866106}
+  m_Layer: 0
+  m_Name: BrushMeshLibrary
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1373866106
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1373866105}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2c5a11e5efdfc484685eb1366196a651, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::FingerPaint.BrushMeshLibrary
+  _sphereRings: 6
+  _sphereSlices: 12
+--- !u!4 &1373866107
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1373866105}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -3.80799, y: -0, z: 29.57079}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1774160848
 GameObject:
   m_ObjectHideFlags: 0
@@ -701,6 +810,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1774160850}
   - component: {fileID: 1774160849}
+  - component: {fileID: 1774160851}
   m_Layer: 0
   m_Name: VoiceDetector
   m_TagString: Untagged
@@ -766,6 +876,24 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1774160851
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1774160848}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f3458c395d3f9e040a9a8c4152eda1d3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::FingerPaint.VoiceAnalyzer
+  _voiceDetector: {fileID: 1774160849}
+  _fftSize: 1024
+  _pitchMinHz: 80
+  _pitchMaxHz: 600
+  _smoothingFactor: 0.2
+  _analyzeEveryNFrames: 1
 --- !u!1 &2092139007
 GameObject:
   m_ObjectHideFlags: 0
@@ -864,3 +992,5 @@ SceneRoots:
   - {fileID: 1249617921}
   - {fileID: 1128206445}
   - {fileID: 1774160850}
+  - {fileID: 939847540}
+  - {fileID: 1373866107}

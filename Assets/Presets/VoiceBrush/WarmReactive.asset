@@ -1,0 +1,139 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fbc0eee07f445ed4fa051bb7cc6a0904, type: 3}
+  m_Name: WarmReactive
+  m_EditorClassIdentifier: Assembly-CSharp::FingerPaint.VoiceBrushProfile
+  BaseColor: {r: 1, g: 0.35, b: 0.15, a: 1}
+  BaseEmissionColor: {r: 1, g: 0.4, b: 0.2, a: 1}
+  BaseEmissionIntensity: 0.3
+  BaseOpacity: 0.6
+  BaseSizeMultiplier: 5
+  BaseMeshIndex: 0
+  BaseFresnelScale: 0.6
+  Mappings:
+  - Source: 1
+    Target: 0
+    ResponseCurve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 0
+        inSlope: 0
+        outSlope: 1
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      - serializedVersion: 3
+        time: 1
+        value: 1
+        inSlope: 1
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    OutputMin: 0
+    OutputMax: 0.15
+    Influence: 1
+  - Source: 0
+    Target: 5
+    ResponseCurve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 0
+        inSlope: 3.301587
+        outSlope: 3.301587
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0.0375
+      - serializedVersion: 3
+        time: 1
+        value: 1
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    OutputMin: 0.6
+    OutputMax: 2.5
+    Influence: 1
+  - Source: 0
+    Target: 3
+    ResponseCurve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 0
+        inSlope: 2
+        outSlope: 2
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      - serializedVersion: 3
+        time: 1
+        value: 1
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    OutputMin: 0.1
+    OutputMax: 2
+    Influence: 0.8
+  - Source: 2
+    Target: 7
+    ResponseCurve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 0
+        inSlope: 2
+        outSlope: 2
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      - serializedVersion: 3
+        time: 1
+        value: 1
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    OutputMin: 0.2
+    OutputMax: 1.8
+    Influence: 0.7
+  OutputSmoothing: 0.25
