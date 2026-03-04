@@ -383,7 +383,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::FingerPaint.VoiceBrushController
   _analyzer: {fileID: 1774160851}
-  _activeProfile: {fileID: 11400000, guid: 5fe85d10d62e64c4ba6214bea386668c, type: 2}
+  _activeProfile: {fileID: 11400000, guid: 701e13a3e110a584ea94d7cb6ad83505, type: 2}
 --- !u!4 &939847540
 Transform:
   m_ObjectHideFlags: 0

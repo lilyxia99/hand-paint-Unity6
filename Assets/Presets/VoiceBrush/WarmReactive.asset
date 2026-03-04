@@ -16,7 +16,7 @@ MonoBehaviour:
   BaseEmissionColor: {r: 1, g: 0.4, b: 0.2, a: 1}
   BaseEmissionIntensity: 0.3
   BaseOpacity: 0.242
-  BaseSizeMultiplier: 5
+  BaseSizeMultiplier: 1
   BaseMeshIndex: 0
   BaseFresnelScale: 0.6
   Mappings:
@@ -76,7 +76,7 @@ MonoBehaviour:
       m_PostInfinity: 2
       m_RotationOrder: 4
     OutputMin: 0.2
-    OutputMax: 8.22
+    OutputMax: 10
     Influence: 1
   - Source: 0
     Target: 3

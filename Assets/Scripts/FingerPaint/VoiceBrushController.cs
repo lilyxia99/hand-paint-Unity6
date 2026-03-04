@@ -43,13 +43,28 @@ namespace FingerPaint
         private float _sMeshIdx;
         private float _sFresnel;
 
+        private bool _wasActive;   // track inactive→active transition
+        private bool _initialized; // ensure Awake inits accumulators
+
         // ─── Lifecycle ──────────────────────────────────────────────────
+
+        private void Awake()
+        {
+            ResetSmoothing();
+            _initialized = true;
+        }
+
+        private void OnEnable()
+        {
+            if (_initialized) ResetSmoothing();
+        }
 
         private void Update()
         {
             if (_analyzer == null || _activeProfile == null)
             {
                 CurrentBrush = default;
+                _wasActive = false;
                 return;
             }
 
@@ -134,16 +149,33 @@ namespace FingerPaint
                 if (freInf > 0f) fresnel  += freDelta / Mathf.Max(1f, freInf);
             }
 
-            // Smooth all outputs
-            float sm = _activeProfile.OutputSmoothing;
-            _sHue      = Mathf.Lerp(_sHue,      hue,      sm);
-            _sSat      = Mathf.Lerp(_sSat,      Mathf.Clamp01(sat), sm);
-            _sVal      = Mathf.Lerp(_sVal,      Mathf.Clamp01(val), sm);
-            _sEmission = Mathf.Lerp(_sEmission, Mathf.Max(0f, emission), sm);
-            _sOpacity  = Mathf.Lerp(_sOpacity,  Mathf.Clamp01(opacity),  sm);
-            _sSize     = Mathf.Lerp(_sSize,     Mathf.Max(0.05f, size),  sm);
-            _sMeshIdx  = Mathf.Lerp(_sMeshIdx,  meshIdx,  sm);
-            _sFresnel  = Mathf.Lerp(_sFresnel,  Mathf.Max(0f, fresnel), sm);
+            // ── Voice onset: snap accumulators to avoid smoothing lag ──
+            if (features.IsActive && !_wasActive)
+            {
+                // First active frame: skip lerp, jump straight to target
+                _sHue      = hue;
+                _sSat      = Mathf.Clamp01(sat);
+                _sVal      = Mathf.Clamp01(val);
+                _sEmission = Mathf.Max(0f, emission);
+                _sOpacity  = Mathf.Clamp01(opacity);
+                _sSize     = Mathf.Max(0.05f, size);
+                _sMeshIdx  = meshIdx;
+                _sFresnel  = Mathf.Max(0f, fresnel);
+            }
+            else
+            {
+                // Smooth all outputs
+                float sm = _activeProfile.OutputSmoothing;
+                _sHue      = Mathf.Lerp(_sHue,      hue,      sm);
+                _sSat      = Mathf.Lerp(_sSat,      Mathf.Clamp01(sat), sm);
+                _sVal      = Mathf.Lerp(_sVal,      Mathf.Clamp01(val), sm);
+                _sEmission = Mathf.Lerp(_sEmission, Mathf.Max(0f, emission), sm);
+                _sOpacity  = Mathf.Lerp(_sOpacity,  Mathf.Clamp01(opacity),  sm);
+                _sSize     = Mathf.Lerp(_sSize,     Mathf.Max(0.05f, size),  sm);
+                _sMeshIdx  = Mathf.Lerp(_sMeshIdx,  meshIdx,  sm);
+                _sFresnel  = Mathf.Lerp(_sFresnel,  Mathf.Max(0f, fresnel), sm);
+            }
+            _wasActive = features.IsActive;
 
             // Hue wraps around [0, 1]
             float finalHue = Mathf.Repeat(_sHue, 1f);
