@@ -8,29 +8,34 @@ Material:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_Name: PaintBallTransparent
-  m_Shader: {fileID: 4800000, guid: 0000000000000000f000000000000000, type: 0}
+  m_Shader: {fileID: 4800000, guid: 3afa83e29b59edb409c233d1ea0ebe07, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
   m_ValidKeywords: []
-  m_InvalidKeywords: []
+  m_InvalidKeywords:
+  - _ENABLEEMISSION_ON
+  - _ENABLEFRESNEL_ON
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
   m_DoubleSidedGI: 0
-  m_CustomRenderQueue: 3000
-  stringTagMap:
-    RenderType: Transparent
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
   disabledShaderPasses: []
+  m_LockedProperties: 
   m_SavedProperties:
     serializedVersion: 3
     m_TexEnvs: []
     m_Ints: []
     m_Floats:
-    - _Opacity: 0.5
+    - _EmissionIntensity: 0.3
+    - _EnableEmission: 1
     - _EnableFresnel: 1
     - _FresnelPower: 2.5
     - _FresnelScale: 0.8
-    - _EnableEmission: 1
-    - _EmissionIntensity: 0.3
+    - _Opacity: 0.067
     m_Colors:
     - _BaseColor: {r: 1, g: 0.4, b: 0.2, a: 0.5}
-    - _FresnelColor: {r: 1, g: 1, b: 1, a: 1}
     - _EmissionColor: {r: 1, g: 0.4, b: 0.2, a: 1}
+    - _FresnelColor: {r: 1, g: 1, b: 1, a: 1}
   m_BuildTextureStacks: []
+  m_AllowLocking: 1

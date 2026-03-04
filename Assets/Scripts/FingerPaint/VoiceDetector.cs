@@ -21,8 +21,26 @@ namespace FingerPaint
         /// <summary>Smoothed normalised volume in [0, 1].</summary>
         public float NormalizedVolume { get; private set; }
 
+        /// <summary>Un-smoothed raw RMS volume from the latest audio chunk.</summary>
+        public float RawVolume { get; private set; }
+
         /// <summary>True once the microphone is capturing successfully.</summary>
         public bool IsMicrophoneAvailable { get; private set; }
+
+        /// <summary>True once the RECORD_AUDIO permission has been granted.</summary>
+        public bool IsPermissionGranted => _permissionGranted;
+
+        /// <summary>Name of the active microphone device, or null.</summary>
+        public string MicDeviceName => _micDeviceName;
+
+        /// <summary>Number of microphone devices detected.</summary>
+        public int MicDeviceCount { get; private set; }
+
+        /// <summary>Current activation threshold (for debug display).</summary>
+        public float ActivationThreshold => _activationThreshold;
+
+        /// <summary>Current deactivation threshold (for debug display).</summary>
+        public float DeactivationThreshold => _deactivationThreshold;
 
         // ─── Configuration ───────────────────────────────────────────────
 
@@ -59,7 +77,6 @@ namespace FingerPaint
         private string _micDeviceName;
         private int _lastSamplePosition;
         private float[] _sampleBuffer;
-        private float _rawVolume;
 
         private bool _permissionGranted;
         private bool _permissionRequested;
@@ -68,10 +85,17 @@ namespace FingerPaint
 
         private void Awake()
         {
+            MicDeviceCount = Microphone.devices.Length;
+            Debug.Log($"[VoiceDetector] Awake — {MicDeviceCount} mic device(s) found.");
+            for (int i = 0; i < MicDeviceCount; i++)
+                Debug.Log($"[VoiceDetector]   [{i}] {Microphone.devices[i]}");
+
 #if UNITY_EDITOR
             _permissionGranted = true;
+            Debug.Log("[VoiceDetector] Running in Editor — permission auto-granted.");
 #elif UNITY_ANDROID
             _permissionGranted = Permission.HasUserAuthorizedPermission("android.permission.RECORD_AUDIO");
+            Debug.Log($"[VoiceDetector] Android RECORD_AUDIO permission: {_permissionGranted}");
 #else
             _permissionGranted = true;
 #endif
@@ -80,9 +104,14 @@ namespace FingerPaint
         private void Start()
         {
             if (_permissionGranted)
+            {
                 StartMicrophone();
+            }
             else
+            {
+                Debug.Log("[VoiceDetector] Permission not yet granted — requesting...");
                 RequestMicrophonePermission();
+            }
         }
 
         private void Update()
@@ -105,7 +134,10 @@ namespace FingerPaint
         private void OnApplicationFocus(bool hasFocus)
         {
             if (hasFocus && _permissionGranted && !IsMicrophoneAvailable)
+            {
+                Debug.Log("[VoiceDetector] App regained focus — restarting microphone.");
                 StartMicrophone();
+            }
         }
 
         private void OnDisable() => StopMicrophone();
@@ -134,7 +166,8 @@ namespace FingerPaint
 
         private void StartMicrophone()
         {
-            if (Microphone.devices.Length == 0)
+            MicDeviceCount = Microphone.devices.Length;
+            if (MicDeviceCount == 0)
             {
                 Debug.LogWarning("[VoiceDetector] No microphone device found.");
                 IsMicrophoneAvailable = false;
@@ -142,7 +175,27 @@ namespace FingerPaint
             }
 
             _micDeviceName = Microphone.devices[0];
+            Debug.Log($"[VoiceDetector] Starting mic: \"{_micDeviceName}\" @ {_sampleRate} Hz, " +
+                      $"buffer {_clipLengthSeconds}s");
+
             _micClip = Microphone.Start(_micDeviceName, loop: true, _clipLengthSeconds, _sampleRate);
+
+            if (_micClip == null)
+            {
+                Debug.LogError("[VoiceDetector] Microphone.Start returned null AudioClip!");
+                IsMicrophoneAvailable = false;
+                return;
+            }
+
+            // Wait briefly for the mic to actually begin recording
+            int timeout = 200; // safety limit
+            while (Microphone.GetPosition(_micDeviceName) <= 0 && timeout > 0)
+                timeout--;
+
+            if (Microphone.GetPosition(_micDeviceName) <= 0)
+            {
+                Debug.LogWarning("[VoiceDetector] Microphone did not start producing samples.");
+            }
 
             // Pre-allocate a buffer for ~100 ms of audio
             int samplesPerChunk = Mathf.Max(1, _sampleRate / 10);
@@ -150,7 +203,8 @@ namespace FingerPaint
             _lastSamplePosition = 0;
 
             IsMicrophoneAvailable = true;
-            Debug.Log($"[VoiceDetector] Microphone started: {_micDeviceName} @ {_sampleRate} Hz");
+            Debug.Log($"[VoiceDetector] Microphone started successfully. " +
+                      $"Clip samples: {_micClip.samples}, channels: {_micClip.channels}");
         }
 
         private void StopMicrophone()
@@ -174,6 +228,7 @@ namespace FingerPaint
             if (_micClip == null) return;
 
             int currentPosition = Microphone.GetPosition(_micDeviceName);
+            if (currentPosition < 0) return; // mic not ready
             if (currentPosition == _lastSamplePosition) return;
 
             // How many new samples are available (ring-buffer aware)
@@ -182,19 +237,22 @@ namespace FingerPaint
                 ? currentPosition - _lastSamplePosition
                 : (totalSamples - _lastSamplePosition) + currentPosition;
 
+            if (samplesToRead <= 0) return;
+
             // Clamp to the pre-allocated buffer size (read most recent chunk)
+            int readOffset;
             if (samplesToRead > _sampleBuffer.Length)
             {
-                int readStart = currentPosition - _sampleBuffer.Length;
-                if (readStart < 0) readStart += totalSamples;
-                _micClip.GetData(_sampleBuffer, readStart);
+                readOffset = currentPosition - _sampleBuffer.Length;
+                if (readOffset < 0) readOffset += totalSamples;
                 samplesToRead = _sampleBuffer.Length;
             }
             else
             {
-                _micClip.GetData(_sampleBuffer, _lastSamplePosition);
+                readOffset = _lastSamplePosition;
             }
 
+            _micClip.GetData(_sampleBuffer, readOffset);
             _lastSamplePosition = currentPosition;
 
             // RMS (root-mean-square) for volume
@@ -205,13 +263,13 @@ namespace FingerPaint
                 sumSquares += s * s;
             }
 
-            _rawVolume = Mathf.Sqrt(sumSquares / samplesToRead);
+            RawVolume = Mathf.Sqrt(sumSquares / samplesToRead);
         }
 
         private void UpdateSmoothedVolume()
         {
             // Exponential moving average
-            NormalizedVolume = Mathf.Lerp(NormalizedVolume, _rawVolume, _smoothingFactor);
+            NormalizedVolume = Mathf.Lerp(NormalizedVolume, RawVolume, _smoothingFactor);
             NormalizedVolume = Mathf.Clamp01(NormalizedVolume);
 
             // Hysteresis to avoid rapid on/off flickering
@@ -229,25 +287,31 @@ namespace FingerPaint
             if (_permissionRequested) return;
             _permissionRequested = true;
 
+            Debug.Log("[VoiceDetector] Requesting android.permission.RECORD_AUDIO...");
+
             var callbacks = new PermissionCallbacks();
-            callbacks.PermissionGranted += _ =>
+            callbacks.PermissionGranted += perm =>
             {
-                Debug.Log("[VoiceDetector] Microphone permission granted.");
+                Debug.Log($"[VoiceDetector] Permission granted: {perm}");
                 _permissionGranted = true;
                 StartMicrophone();
             };
-            callbacks.PermissionDenied += _ =>
+            callbacks.PermissionDenied += perm =>
             {
-                Debug.LogWarning("[VoiceDetector] Microphone permission denied.");
+                Debug.LogWarning($"[VoiceDetector] Permission denied: {perm}");
                 IsMicrophoneAvailable = false;
             };
-            callbacks.PermissionDeniedAndDontAskAgain += _ =>
+            callbacks.PermissionDeniedAndDontAskAgain += perm =>
             {
-                Debug.LogWarning("[VoiceDetector] Microphone permission permanently denied.");
+                Debug.LogWarning($"[VoiceDetector] Permission permanently denied: {perm}");
                 IsMicrophoneAvailable = false;
             };
 
             Permission.RequestUserPermission("android.permission.RECORD_AUDIO", callbacks);
+#else
+            // Non-Android: no permission needed, just start
+            _permissionGranted = true;
+            StartMicrophone();
 #endif
         }
     }

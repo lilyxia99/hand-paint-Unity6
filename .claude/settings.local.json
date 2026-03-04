@@ -2,7 +2,11 @@
   "permissions": {
     "allow": [
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(dotnet build:*)",
+      "Bash(where:*)",
+      "Bash(xxd:*)",
+      "Bash(powershell -Command:*)"
     ]
   }
 }
