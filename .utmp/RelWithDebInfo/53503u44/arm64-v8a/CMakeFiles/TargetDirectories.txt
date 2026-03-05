@@ -1,0 +1,5 @@
+C:/Users/l_xia/Documents/DEVELOPER/hand-paint/My project/.utmp/RelWithDebInfo/53503u44/arm64-v8a/CMakeFiles/edit_cache.dir
+C:/Users/l_xia/Documents/DEVELOPER/hand-paint/My project/.utmp/RelWithDebInfo/53503u44/arm64-v8a/CMakeFiles/rebuild_cache.dir
+C:/Users/l_xia/Documents/DEVELOPER/hand-paint/My project/.utmp/RelWithDebInfo/53503u44/arm64-v8a/GameActivity/CMakeFiles/game.dir
+C:/Users/l_xia/Documents/DEVELOPER/hand-paint/My project/.utmp/RelWithDebInfo/53503u44/arm64-v8a/GameActivity/CMakeFiles/edit_cache.dir
+C:/Users/l_xia/Documents/DEVELOPER/hand-paint/My project/.utmp/RelWithDebInfo/53503u44/arm64-v8a/GameActivity/CMakeFiles/rebuild_cache.dir

@@ -1,20 +1,25 @@
-<?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
-
-  <!-- Voice detection: Microphone access for VoiceDetector -->
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools" android:installLocation="auto" xmlns:horizonos="http://schemas.horizonos/sdk">
+  <application android:label="@string/app_name" android:icon="@mipmap/app_icon" android:allowBackup="false">
+    <activity android:theme="@style/Theme.AppCompat.DayNight.NoActionBar" android:configChanges="locale|fontScale|keyboard|keyboardHidden|mcc|mnc|navigation|orientation|screenLayout|screenSize|smallestScreenSize|touchscreen|uiMode" android:launchMode="singleTask" android:name="com.unity3d.player.UnityPlayerGameActivity" android:excludeFromRecents="true" android:exported="true">
+      <intent-filter>
+        <action android:name="android.intent.action.MAIN" />
+        <category android:name="android.intent.category.LAUNCHER" />
+        <category android:name="com.oculus.intent.category.VR" />
+      </intent-filter>
+      <meta-data android:name="com.oculus.vr.focusaware" android:value="true" />
+    </activity>
+    <meta-data android:name="unityplayer.SkipPermissionsDialog" android:value="false" />
+    <meta-data android:name="com.oculus.ossplash.background" android:value="black" />
+    <meta-data android:name="com.oculus.telemetry.project_guid" android:value="d6ecdac8-bf8f-4913-b919-5962bc104916" />
+    <meta-data android:name="com.oculus.supportedDevices" android:value="quest|quest2|questpro|quest3|quest3s" tools:replace="android:value" />
+  </application>
+  <!-- Microphone: required for VoiceDetector -->
   <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
-  <!-- Mesh export: write OBJ files to persistent storage -->
-  <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
-  <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
-
-  <!-- Hand tracking: declare as a feature (not required, so app still installs on devices without it) -->
+  <!-- Hand tracking feature (optional, app works with controllers too) -->
   <uses-feature android:name="oculus.software.handtracking" android:required="false" />
-  <uses-feature android:name="com.oculus.handtracking" android:required="false" />
 
-  <application>
-    <meta-data android:name="com.oculus.handtracking.frequency" android:value="HIGH" />
-    <meta-data android:name="com.oculus.handtracking.version" android:value="V2.0" />
-  </application>
-
+  <uses-feature android:name="android.hardware.vr.headtracking" android:version="1" android:required="true" />
+  <horizonos:uses-horizonos-sdk horizonos:minSdkVersion="60" horizonos:targetSdkVersion="85" />
 </manifest>

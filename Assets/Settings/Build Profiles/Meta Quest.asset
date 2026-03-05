@@ -31,7 +31,7 @@ MonoBehaviour:
     - line: '|   AndroidProfiler: 0'
     - line: '|   AndroidFilterTouchesWhenObscured: 0'
     - line: '|   AndroidEnableSustainedPerformanceMode: 0'
-    - line: '|   defaultScreenOrientation: 4'
+    - line: '|   defaultScreenOrientation: 3'
     - line: '|   targetDevice: 2'
     - line: '|   useOnDemandResources: 0'
     - line: '|   accelerometerFrequency: 60'
@@ -169,7 +169,10 @@ MonoBehaviour:
     - line: '|   tvOSBundleVersion: 1.0'
     - line: '|   bundleVersion: 9.2.1'
     - line: '|   preloadedAssets:'
-    - line: '|   - {instanceID: 0}'
+    - line: '|   - {fileID: 11400000, guid: d232a279f47394c44aff95b839f7c88e, type:
+        2}'
+    - line: '|   - {fileID: 11400000, guid: 09b263a861d8b324a9bc5deae085e5ce, type:
+        2}'
     - line: '|   metroInputSource: 0'
     - line: '|   wsaTransparentSwapchain: 0'
     - line: '|   m_HolographicPauseOnTrackingLoss: 1'
@@ -202,8 +205,8 @@ MonoBehaviour:
     - line: '|     tvOS: 0'
     - line: '|   overrideDefaultApplicationIdentifier: 1'
     - line: '|   AndroidBundleVersionCode: 1'
-    - line: '|   AndroidMinSdkVersion: 29'
-    - line: '|   AndroidTargetSdkVersion: 32'
+    - line: '|   AndroidMinSdkVersion: 32'
+    - line: '|   AndroidTargetSdkVersion: 34'
     - line: '|   AndroidPreferredInstallLocation: 0'
     - line: '|   AndroidPreferredDataLocation: 1'
     - line: '|   aotOptions: '
@@ -598,7 +601,7 @@ MonoBehaviour:
     - line: '|   - m_BuildTarget: LuminSupport'
     - line: '|     m_GraphicsJobs: 0'
     - line: '|   - m_BuildTarget: AndroidPlayer'
-    - line: '|     m_GraphicsJobs: 0'
+    - line: '|     m_GraphicsJobs: 1'
     - line: '|   - m_BuildTarget: WebGLSupport'
     - line: '|     m_GraphicsJobs: 0'
     - line: '|   m_BuildTargetGraphicsJobMode:'
@@ -606,6 +609,8 @@ MonoBehaviour:
     - line: '|     m_GraphicsJobMode: 0'
     - line: '|   - m_BuildTarget: XboxOnePlayer'
     - line: '|     m_GraphicsJobMode: 0'
+    - line: '|   - m_BuildTarget: AndroidPlayer'
+    - line: '|     m_GraphicsJobMode: 1'
     - line: '|   m_BuildTargetGraphicsAPIs:'
     - line: '|   - m_BuildTarget: AndroidPlayer'
     - line: '|     m_APIs: 15000000'
@@ -916,7 +921,7 @@ MonoBehaviour:
     - line: '|   webWasm2023: 0'
     - line: '|   webEnableSubmoduleStrippingCompatibility: 0'
     - line: '|   scriptingDefineSymbols:'
-    - line: '|     Android: USE_INPUT_SYSTEM_POSE_CONTROL;UNITY_POST_PROCESSING_STACK_V2;USE_STICK_CONTROL_THUMBSTICKS'
+    - line: '|     Android: USE_INPUT_SYSTEM_POSE_CONTROL;UNITY_POST_PROCESSING_STACK_V2;USE_STICK_CONTROL_THUMBSTICKS;OVR_DISABLE_HAND_PINCH_BUTTON_MAPPING'
     - line: '|     CloudRendering: UNITY_POST_PROCESSING_STACK_V2'
     - line: '|     EmbeddedLinux: UNITY_POST_PROCESSING_STACK_V2'
     - line: '|     GameCoreXboxOne: UNITY_POST_PROCESSING_STACK_V2'
@@ -925,7 +930,7 @@ MonoBehaviour:
     - line: '|     PS4: UNITY_POST_PROCESSING_STACK_V2'
     - line: '|     PS5: UNITY_POST_PROCESSING_STACK_V2'
     - line: '|     Stadia: UNITY_POST_PROCESSING_STACK_V2'
-    - line: '|     Standalone: USE_INPUT_SYSTEM_POSE_CONTROL;UNITY_POST_PROCESSING_STACK_V2;USE_STICK_CONTROL_THUMBSTICKS'
+    - line: '|     Standalone: USE_INPUT_SYSTEM_POSE_CONTROL;UNITY_POST_PROCESSING_STACK_V2;USE_STICK_CONTROL_THUMBSTICKS;OVR_DISABLE_HAND_PINCH_BUTTON_MAPPING'
     - line: '|     WebGL: UNITY_POST_PROCESSING_STACK_V2'
     - line: '|     Windows Store Apps: USE_INPUT_SYSTEM_POSE_CONTROL;UNITY_POST_PROCESSING_STACK_V2;USE_STICK_CONTROL_THUMBSTICKS'
     - line: '|     XboxOne: UNITY_POST_PROCESSING_STACK_V2'
@@ -1064,7 +1069,7 @@ MonoBehaviour:
         m_ExplicitNullChecks: 0
         m_ExplicitDivideByZeroChecks: 0
         m_ExplicitArrayBoundsChecks: 0
-        m_CompressionType: -1
+        m_CompressionType: 2
         m_InstallInBuildFolder: 0
         m_InsightsSettingsContainer:
           m_BuildProfileEngineDiagnosticsState: 2
@@ -1072,7 +1077,7 @@ MonoBehaviour:
         m_BuildSubtarget: 0
         m_BuildSystem: 1
         m_ExportAsGoogleAndroidProject: 0
-        m_DebugSymbolLevel: 1
+        m_DebugSymbolLevel: 4
         m_DebugSymbolFormat: 5
         m_CurrentDeploymentTargetId: __builtin__target_default
         m_BuildType: 2
