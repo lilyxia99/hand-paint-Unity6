@@ -42,6 +42,8 @@ namespace FingerPaint
 
         private GameObject _handInstance;
         private Animator _animator;
+        private Vector3 _startLocalPos;
+        private Quaternion _startLocalRot;
 
         // ─── Public API ─────────────────────────────────────────────────
 
@@ -106,6 +108,10 @@ namespace FingerPaint
                 var stateInfo = _animator.GetCurrentAnimatorStateInfo(0);
                 if (stateInfo.normalizedTime >= 1.0f)
                 {
+                    // Reset position so root motion doesn't accumulate across loops
+                    _handInstance.transform.localPosition = _startLocalPos;
+                    _handInstance.transform.localRotation = _startLocalRot;
+
                     if (_loopBlendDuration > 0f)
                     {
                         // Smooth blend: crossfade from end pose back to start pose
@@ -179,6 +185,12 @@ namespace FingerPaint
 
             _animator.runtimeAnimatorController = _animatorController;
             _animator.applyRootMotion = true;
+
+            // Force evaluate frame 0 so the hand snaps to its starting pose,
+            // then cache that position for loop resets.
+            _animator.Update(0f);
+            _startLocalPos = _handInstance.transform.localPosition;
+            _startLocalRot = _handInstance.transform.localRotation;
 
             Debug.Log($"[HandAnimationPlayer] Playback ready: {_handInstance.name} with {_animatorController.name} (loop={_loop})");
         }
