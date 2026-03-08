@@ -16,6 +16,9 @@ namespace FingerPaint
     ///   runtime hand mesh data isn't available from the subsystem. By disabling it,
     ///   we take control of the renderer ourselves while the skeleton still animates.
     ///
+    /// LateUpdate forces the renderer.enabled state every frame as a safety net,
+    /// preventing any XR component from overriding our visibility setting.
+    ///
     /// This script does NOT subscribe to any XRHandSubsystem events and does NOT call
     /// SetActive on the hand instances, avoiding interference with HandTrackingManager.
     /// </summary>
@@ -43,6 +46,7 @@ namespace FingerPaint
         private SkinnedMeshRenderer _rightRenderer;
         private Material _originalLeftMaterial;
         private Material _originalRightMaterial;
+        private bool _setupDone;
 
         // ─── Public API ─────────────────────────────────────────────────
 
@@ -64,7 +68,6 @@ namespace FingerPaint
         public void SetVisibility(bool visible)
         {
             _showHands = visible;
-            ApplyVisibility();
         }
 
         // ─── Lifecycle ──────────────────────────────────────────────────
@@ -73,7 +76,32 @@ namespace FingerPaint
         {
             InstantiateHands();
             ApplyMaterial();
-            ApplyVisibility();
+
+            Debug.Log($"[HandMeshVisualizer] Start complete. " +
+                      $"LeftRenderer: {(_leftRenderer != null ? _leftRenderer.gameObject.name : "NULL")}, " +
+                      $"RightRenderer: {(_rightRenderer != null ? _rightRenderer.gameObject.name : "NULL")}");
+
+            _setupDone = true;
+        }
+
+        /// <summary>
+        /// Every LateUpdate, force the renderer.enabled to match our _showHands flag.
+        /// This is the nuclear option: even if XRHandMeshController or any other XR
+        /// component re-subscribes and toggles the renderer, we override it here.
+        /// </summary>
+        private void LateUpdate()
+        {
+            if (!_setupDone) return;
+
+            if (_leftRenderer != null && _leftRenderer.enabled != _showHands)
+            {
+                _leftRenderer.enabled = _showHands;
+            }
+
+            if (_rightRenderer != null && _rightRenderer.enabled != _showHands)
+            {
+                _rightRenderer.enabled = _showHands;
+            }
         }
 
         private void OnDestroy()
@@ -87,7 +115,6 @@ namespace FingerPaint
             if (Application.isPlaying)
             {
                 ApplyMaterial();
-                ApplyVisibility();
             }
         }
 
@@ -127,11 +154,8 @@ namespace FingerPaint
         /// <summary>
         /// Configures an instantiated hand prefab:
         /// 1. Finds the SkinnedMeshRenderer and caches the original material.
-        /// 2. Disables XRHandMeshController so it stops managing renderer.enabled
-        ///    (it hides the mesh when runtime hand mesh data isn't available).
-        /// 3. Explicitly enables the SkinnedMeshRenderer so the static FBX mesh is visible.
-        /// The XRHandTrackingEvents + XRHandSkeletonDriver remain active and continue
-        /// driving the bone transforms from XR tracking data — the mesh still animates.
+        /// 2. Disables XRHandMeshController so it stops managing renderer.enabled.
+        /// 3. Explicitly enables the SkinnedMeshRenderer so the mesh is visible.
         /// </summary>
         private static void SetupHand(
             GameObject handInstance,
@@ -149,18 +173,20 @@ namespace FingerPaint
             if (renderer != null)
             {
                 originalMaterial = renderer.sharedMaterial;
-
-                // Force the renderer ON — XRHandMeshController may have left it disabled
                 renderer.enabled = true;
+
+                Debug.Log($"[HandMeshVisualizer] Found SkinnedMeshRenderer on \"{renderer.gameObject.name}\" " +
+                          $"(mesh: {(renderer.sharedMesh != null ? renderer.sharedMesh.name : "NULL")}, " +
+                          $"bones: {renderer.bones.Length}, " +
+                          $"material: {(renderer.sharedMaterial != null ? renderer.sharedMaterial.name : "NULL")})");
             }
             else
             {
-                Debug.LogWarning($"[HandMeshVisualizer] No SkinnedMeshRenderer found on {handInstance.name}");
+                Debug.LogError($"[HandMeshVisualizer] No SkinnedMeshRenderer found on {handInstance.name} or children!");
             }
 
             // Disable XRHandMeshController so it stops fighting over renderer.enabled.
             // We search by type name to avoid a hard compile dependency on the XR Hands assembly.
-            // The XRHandSkeletonDriver still drives bones → the mesh still animates.
             DisableComponentByName(handInstance, "XRHandMeshController");
         }
 
@@ -183,17 +209,6 @@ namespace FingerPaint
             }
         }
 
-        // ─── Visibility ─────────────────────────────────────────────────
-
-        private void ApplyVisibility()
-        {
-            if (_leftRenderer != null)
-                _leftRenderer.enabled = _showHands;
-
-            if (_rightRenderer != null)
-                _rightRenderer.enabled = _showHands;
-        }
-
         // ─── Helpers ───────────────────────────────────────────────────
 
         /// <summary>
@@ -203,16 +218,18 @@ namespace FingerPaint
         /// </summary>
         private static void DisableComponentByName(GameObject root, string typeName)
         {
-            // Check root first, then children
             foreach (var comp in root.GetComponentsInChildren<MonoBehaviour>(true))
             {
                 if (comp != null && comp.GetType().Name == typeName)
                 {
                     comp.enabled = false;
-                    Debug.Log($"[HandMeshVisualizer] Disabled {typeName} on {root.name} — we manage the renderer.");
+                    Debug.Log($"[HandMeshVisualizer] Disabled {typeName} on \"{comp.gameObject.name}\".");
                     return;
                 }
             }
+
+            // Not found — log so we know
+            Debug.LogWarning($"[HandMeshVisualizer] Could not find {typeName} on {root.name} or children.");
         }
     }
 }
