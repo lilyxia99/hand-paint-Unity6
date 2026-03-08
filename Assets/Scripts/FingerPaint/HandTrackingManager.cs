@@ -172,6 +172,28 @@ namespace FingerPaint
             return true;
         }
 
+        /// <summary>
+        /// Returns the palm normal vector (pointing outward from the palm surface)
+        /// for the specified hand. Useful for detecting palm-facing-self gestures.
+        /// </summary>
+        public bool TryGetPalmNormal(bool leftHand, out Vector3 palmNormal)
+        {
+            palmNormal = Vector3.zero;
+            XRHand hand = GetHand(leftHand);
+
+            if (!hand.isTracked)
+                return false;
+
+            var palmJoint = hand.GetJoint(XRHandJointID.Palm);
+            if (!palmJoint.TryGetPose(out Pose palmPose))
+                return false;
+
+            // OpenXR convention: palm normal (outward from palm surface)
+            // is the negative forward direction of the palm joint
+            palmNormal = -palmPose.forward;
+            return true;
+        }
+
         private XRHand GetHand(bool left)
         {
             if (_handSubsystem == null)

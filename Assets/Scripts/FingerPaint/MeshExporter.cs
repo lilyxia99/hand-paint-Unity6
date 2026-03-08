@@ -2,37 +2,27 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using UnityEngine;
-#if UNITY_ANDROID && !UNITY_EDITOR
-using UnityEngine.Android;
-#endif
 
 namespace FingerPaint
 {
     /// <summary>
     /// Combines all spawned paint spheres into a single mesh and exports as OBJ.
-    /// Writes to /storage/emulated/0/Download/ on Quest (Android internal storage).
-    /// Handles Android runtime permission requests.
+    /// Writes to Application.persistentDataPath/SavedWorks/ for app-internal storage.
+    /// Integrates with GalleryManager to track saved works in a manifest.
     /// </summary>
     public class MeshExporter : MonoBehaviour
     {
         [SerializeField] private FingerPainter _painter;
         [SerializeField] private string _filePrefix = "FingerPaint";
 
+        [Header("Gallery Integration")]
+        [SerializeField] private GalleryManager _galleryManager;
+
         /// <summary>Max vertices per combined sub-mesh (Unity limit is 65535 for 16-bit index).</summary>
         private const int MaxVerticesPerBatch = 60000;
 
-        private bool _permissionGranted;
-        private bool _exportPending;
-
-        private void Start()
-        {
-#if UNITY_EDITOR
-            _permissionGranted = true;
-#endif
-        }
-
         /// <summary>
-        /// Call this to trigger export. Requests permissions first if needed.
+        /// Call this to trigger export.
         /// </summary>
         public void Export()
         {
@@ -42,57 +32,11 @@ namespace FingerPaint
                 return;
             }
 
-#if UNITY_ANDROID && !UNITY_EDITOR
-            // On Android 10+ (API 29+) with scoped storage, apps can write to
-            // their own Download directory without WRITE_EXTERNAL_STORAGE.
-            // But on Quest OS (Android-based), permission may still be needed.
-            if (!_permissionGranted)
-            {
-                RequestAndroidPermission();
-                _exportPending = true;
-                return;
-            }
-#endif
             PerformExport();
-        }
-
-        private void RequestAndroidPermission()
-        {
-#if UNITY_ANDROID && !UNITY_EDITOR
-            if (Permission.HasUserAuthorizedPermission(Permission.ExternalStorageWrite))
-            {
-                _permissionGranted = true;
-                if (_exportPending)
-                    PerformExport();
-                return;
-            }
-
-            var callbacks = new PermissionCallbacks();
-            callbacks.PermissionGranted += _ =>
-            {
-                _permissionGranted = true;
-                if (_exportPending)
-                    PerformExport();
-            };
-            callbacks.PermissionDenied += _ =>
-            {
-                Debug.LogError("[MeshExporter] Storage permission denied.");
-                _exportPending = false;
-            };
-            callbacks.PermissionDeniedAndDontAskAgain += _ =>
-            {
-                Debug.LogError("[MeshExporter] Storage permission permanently denied.");
-                _exportPending = false;
-            };
-
-            Permission.RequestUserPermission(Permission.ExternalStorageWrite, callbacks);
-#endif
         }
 
         private void PerformExport()
         {
-            _exportPending = false;
-
             var allPoints = _painter.GetAllPoints();
             if (allPoints.Count == 0)
                 return;
@@ -144,6 +88,20 @@ namespace FingerPaint
                 string obj = MeshToObj(merged, _filePrefix);
                 File.WriteAllText(path, obj);
                 Debug.Log($"[MeshExporter] Exported {merged.vertexCount} vertices to: {path}");
+
+                // Register in gallery manifest
+                if (_galleryManager != null)
+                {
+                    var entry = new GalleryEntry
+                    {
+                        id = $"fp_{System.DateTime.Now:yyyyMMdd_HHmmss}",
+                        filename = filename,
+                        timestamp = System.DateTime.Now.ToString("o"),
+                        pointCount = allPoints.Count,
+                        vertexCount = merged.vertexCount
+                    };
+                    _galleryManager.AddEntry(entry);
+                }
             }
             catch (System.Exception ex)
             {
@@ -190,12 +148,7 @@ namespace FingerPaint
 
         private static string GetExportDirectory()
         {
-#if UNITY_ANDROID && !UNITY_EDITOR
-            return "/storage/emulated/0/Download";
-#else
-            // In-editor: write to project root for testing
-            return Path.Combine(Application.dataPath, "..", "ExportedMeshes");
-#endif
+            return Path.Combine(Application.persistentDataPath, "SavedWorks");
         }
 
         private static string MeshToObj(Mesh mesh, string objectName)

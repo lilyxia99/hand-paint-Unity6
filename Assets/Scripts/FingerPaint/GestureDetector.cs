@@ -12,6 +12,7 @@ namespace FingerPaint
     {
         [SerializeField] private HandTrackingManager _handTracking;
         [SerializeField] private MeshExporter _exporter;
+        [SerializeField] private ClearGestureDetector _clearDetector;
 
         [Header("Gesture Timing")]
         [SerializeField] private float _holdDuration = 1.0f;   // seconds to hold before trigger
@@ -33,6 +34,15 @@ namespace FingerPaint
             if (_cooldownTimer > 0f)
             {
                 _cooldownTimer -= Time.deltaTime;
+                return;
+            }
+
+            // Suppress save gesture while clear confirmation is active
+            // (thumbs-up means "confirm clear" during that window, not "save")
+            if (_clearDetector != null && _clearDetector.IsWaitingForConfirmation)
+            {
+                _holdTimer = 0f;
+                _gestureActive = false;
                 return;
             }
 

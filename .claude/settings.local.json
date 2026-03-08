@@ -6,7 +6,8 @@
       "Bash(dotnet build:*)",
       "Bash(where:*)",
       "Bash(xxd:*)",
-      "Bash(powershell -Command:*)"
+      "Bash(powershell -Command:*)",
+      "Bash(xargs grep -l \"VoiceFeatures\\\\|BrushState\")"
     ]
   }
 }

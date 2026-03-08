@@ -6,8 +6,8 @@ namespace FingerPaint
     /// <summary>
     /// Spawns small spheres at active fingertip positions, throttled by minimum distance.
     /// Maintains per-finger point lists for later mesh export.
-    /// Supports three trigger modes: finger extension, voice activation, or both combined.
-    /// Sphere size can scale dynamically based on voice volume.
+    /// Supports four trigger modes including DualMode: temporary balls when silent,
+    /// permanent voice-reactive balls when speaking.
     /// </summary>
     public class FingerPainter : MonoBehaviour
     {
@@ -20,7 +20,9 @@ namespace FingerPaint
             /// <summary>Draw when microphone detects voice. All tracked fingers paint.</summary>
             Voice,
             /// <summary>Both finger extension AND voice must be active to draw.</summary>
-            Combined
+            Combined,
+            /// <summary>Always spawns when extended. Temporary if silent, permanent if speaking.</summary>
+            DualMode
         }
 
         [Header("References")]
@@ -28,7 +30,7 @@ namespace FingerPaint
 
         [Header("Trigger")]
         [SerializeField] private DrawTriggerMode _triggerMode = DrawTriggerMode.FingerExtension;
-        [Tooltip("Required when Trigger Mode is Voice or Combined.")]
+        [Tooltip("Required when Trigger Mode is Voice, Combined, or DualMode.")]
         [SerializeField] private VoiceDetector _voiceDetector;
 
         [Header("Voice Brush (Optional)")]
@@ -69,9 +71,24 @@ namespace FingerPaint
             new Color(0.2f, 0.5f, 1f),     // R Little - blue
         };
 
+        // ─── Dual-mode temporary ball settings ──────────────────────────
+
+        [Header("Dual-Mode (Temporary Balls)")]
+        [Tooltip("Maximum number of temporary balls in the scene before oldest start fading.")]
+        [SerializeField] private int _maxTemporaryBalls = 500;
+
+        [Tooltip("How long a temporary ball takes to fade out once marked for removal (seconds).")]
+        [SerializeField] private float _fadeOutDuration = 1.5f;
+
+        [Tooltip("Base color for temporary (silent) balls.")]
+        [SerializeField] private Color _tempBallColor = new Color(0.6f, 0.6f, 0.8f, 1f);
+
+        [Tooltip("Opacity for temporary (silent) balls.")]
+        [SerializeField] [Range(0f, 1f)] private float _tempBallOpacity = 0.25f;
+
         // ─── Runtime state ───────────────────────────────────────────────
 
-        /// <summary>Per-finger list of spawned GameObjects (spheres).</summary>
+        /// <summary>Per-finger list of spawned permanent GameObjects (spheres).</summary>
         public List<GameObject>[] PointsByFinger { get; private set; }
 
         private Vector3[] _lastSpawnPos;
@@ -86,6 +103,23 @@ namespace FingerPaint
         private static readonly int _idEmissionColor     = Shader.PropertyToID("_EmissionColor");
         private static readonly int _idEmissionIntensity = Shader.PropertyToID("_EmissionIntensity");
         private static readonly int _idFresnelScale      = Shader.PropertyToID("_FresnelScale");
+
+        // ─── Temporary ball ring buffer (DualMode) ──────────────────────
+
+        private struct TemporaryBall
+        {
+            public GameObject Go;
+            public MeshRenderer Renderer;
+            public MaterialPropertyBlock PropBlock;
+            public float FadeStartTime; // -1 = not fading
+            public float BaseOpacity;
+        }
+
+        private const int RingBufferCapacity = 600;
+        private TemporaryBall[] _tempRing;
+        private int _tempHead; // index of oldest entry
+        private int _tempCount; // number of active entries
+        private int _tempFadingCount; // how many are currently fading
 
         // ─── Lifecycle ───────────────────────────────────────────────────
 
@@ -102,6 +136,12 @@ namespace FingerPaint
 
             _propBlock = new MaterialPropertyBlock();
 
+            // Initialize ring buffer for temporary balls
+            _tempRing = new TemporaryBall[RingBufferCapacity];
+            _tempHead = 0;
+            _tempCount = 0;
+            _tempFadingCount = 0;
+
             BuildSharedMesh();
             BuildMaterials();
         }
@@ -111,15 +151,27 @@ namespace FingerPaint
             if (_handTracking == null)
                 return;
 
+            if (_triggerMode == DrawTriggerMode.DualMode)
+            {
+                UpdateDualMode();
+            }
+            else
+            {
+                UpdateClassicMode();
+            }
+        }
+
+        // ─── Classic mode (unchanged original behavior) ─────────────────
+
+        private void UpdateClassicMode()
+        {
             for (int i = 0; i < HandTrackingManager.FingerCount; i++)
             {
                 ref var finger = ref _handTracking.Fingers[i];
 
-                // Finger must always be tracked (we need its position)
                 if (!finger.IsTracked)
                     continue;
 
-                // Check activation based on the selected trigger mode
                 if (!ShouldDraw(ref finger))
                     continue;
 
@@ -132,17 +184,45 @@ namespace FingerPaint
             }
         }
 
+        // ─── Dual mode: temporary when silent, permanent when speaking ──
+
+        private void UpdateDualMode()
+        {
+            bool voiceActive = _voiceDetector != null && _voiceDetector.IsActive;
+
+            for (int i = 0; i < HandTrackingManager.FingerCount; i++)
+            {
+                ref var finger = ref _handTracking.Fingers[i];
+
+                if (!finger.IsTracked || !finger.IsExtended)
+                    continue;
+
+                float dist = Vector3.Distance(finger.TipPosition, _lastSpawnPos[i]);
+                if (dist < _minDistance)
+                    continue;
+
+                if (voiceActive)
+                    SpawnPoint(i, finger.TipPosition);       // permanent, voice-reactive
+                else
+                    SpawnTemporaryPoint(i, finger.TipPosition); // temporary, fades away
+
+                _lastSpawnPos[i] = finger.TipPosition;
+            }
+
+            UpdateTemporaryBalls();
+        }
+
         private void OnValidate()
         {
             if (_triggerMode != DrawTriggerMode.FingerExtension && _voiceDetector == null)
             {
                 Debug.LogWarning(
                     "[FingerPainter] VoiceDetector reference is required " +
-                    "when Trigger Mode is Voice or Combined.");
+                    "when Trigger Mode is Voice, Combined, or DualMode.");
             }
         }
 
-        // ─── Trigger logic ───────────────────────────────────────────────
+        // ─── Trigger logic (classic modes only) ─────────────────────────
 
         private bool ShouldDraw(ref HandTrackingManager.FingerState finger)
         {
@@ -152,11 +232,9 @@ namespace FingerPaint
                     return finger.IsExtended;
 
                 case DrawTriggerMode.Voice:
-                    // Voice alone controls activation; all tracked fingers paint
                     return _voiceDetector != null && _voiceDetector.IsActive;
 
                 case DrawTriggerMode.Combined:
-                    // Finger must be extended AND voice must be active
                     return finger.IsExtended
                         && _voiceDetector != null
                         && _voiceDetector.IsActive;
@@ -166,7 +244,7 @@ namespace FingerPaint
             }
         }
 
-        // ─── Spawning ────────────────────────────────────────────────────
+        // ─── Permanent spawning (existing logic) ────────────────────────
 
         private void SpawnPoint(int fingerIndex, Vector3 worldPos)
         {
@@ -186,7 +264,8 @@ namespace FingerPaint
             }
             else if (_voiceDetector != null
                      && (_triggerMode == DrawTriggerMode.Voice
-                         || _triggerMode == DrawTriggerMode.Combined))
+                         || _triggerMode == DrawTriggerMode.Combined
+                         || _triggerMode == DrawTriggerMode.DualMode))
             {
                 sizeMultiplier = _voiceDetector.GetSizeMultiplier();
             }
@@ -226,9 +305,171 @@ namespace FingerPaint
             PointsByFinger[fingerIndex].Add(go);
         }
 
+        // ─── Temporary ball spawning (DualMode, silent) ─────────────────
+
+        private void SpawnTemporaryPoint(int fingerIndex, Vector3 worldPos)
+        {
+            // If ring buffer is full, force-destroy the oldest entry
+            if (_tempCount >= RingBufferCapacity)
+            {
+                ForceDestroyOldestTemporary();
+            }
+
+            var go = new GameObject($"Temp_{fingerIndex}_{_tempCount}");
+            go.transform.SetParent(transform, false);
+            go.transform.position = worldPos;
+            go.transform.localScale = Vector3.one * (_sphereRadius * 2f);
+
+            var mf = go.AddComponent<MeshFilter>();
+            mf.sharedMesh = _sharedSphereMesh;
+
+            var mr = go.AddComponent<MeshRenderer>();
+            mr.sharedMaterial = _fingerMaterials[fingerIndex];
+
+            // Set transparent appearance for temporary ball
+            var propBlock = new MaterialPropertyBlock();
+            propBlock.SetColor(_idBaseColor, _tempBallColor);
+            propBlock.SetFloat(_idOpacity, _tempBallOpacity);
+            propBlock.SetFloat(_idEmissionIntensity, 0f);
+            propBlock.SetFloat(_idFresnelScale, 0.3f);
+            mr.SetPropertyBlock(propBlock);
+
+            // Add to ring buffer
+            int idx = (_tempHead + _tempCount) % RingBufferCapacity;
+            _tempRing[idx] = new TemporaryBall
+            {
+                Go = go,
+                Renderer = mr,
+                PropBlock = propBlock,
+                FadeStartTime = -1f,
+                BaseOpacity = _tempBallOpacity
+            };
+            _tempCount++;
+        }
+
+        // ─── Temporary ball lifecycle ───────────────────────────────────
+
+        private void UpdateTemporaryBalls()
+        {
+            // Phase 1: Mark oldest non-fading balls for fade if count exceeds limit
+            int activeCount = _tempCount - _tempFadingCount;
+            int excess = activeCount - _maxTemporaryBalls;
+
+            if (excess > 0)
+            {
+                int marked = 0;
+                for (int i = 0; i < _tempCount && marked < excess; i++)
+                {
+                    int idx = (_tempHead + i) % RingBufferCapacity;
+                    if (_tempRing[idx].FadeStartTime < 0f)
+                    {
+                        _tempRing[idx].FadeStartTime = Time.time;
+                        _tempFadingCount++;
+                        marked++;
+                    }
+                }
+            }
+
+            // Phase 2: Update fading balls and destroy completed ones
+            while (_tempCount > 0)
+            {
+                ref var ball = ref _tempRing[_tempHead];
+
+                // Skip non-fading balls at the front (can't dequeue past them)
+                if (ball.FadeStartTime < 0f)
+                    break;
+
+                float elapsed = Time.time - ball.FadeStartTime;
+                if (elapsed >= _fadeOutDuration)
+                {
+                    // Fully faded — destroy and dequeue
+                    if (ball.Go != null)
+                        Destroy(ball.Go);
+
+                    ball = default;
+                    _tempHead = (_tempHead + 1) % RingBufferCapacity;
+                    _tempCount--;
+                    _tempFadingCount--;
+                }
+                else
+                {
+                    // Still fading — update opacity
+                    float t = elapsed / _fadeOutDuration;
+                    float newOpacity = Mathf.Lerp(ball.BaseOpacity, 0f, t);
+
+                    if (ball.Renderer != null)
+                    {
+                        ball.PropBlock.SetFloat(_idOpacity, newOpacity);
+                        ball.Renderer.SetPropertyBlock(ball.PropBlock);
+                    }
+                    break; // Older balls are still fading, stop here
+                }
+            }
+
+            // Phase 3: Also update opacity for any fading balls beyond the head
+            // (in case multiple are fading simultaneously)
+            for (int i = 1; i < _tempCount; i++)
+            {
+                int idx = (_tempHead + i) % RingBufferCapacity;
+                ref var ball = ref _tempRing[idx];
+
+                if (ball.FadeStartTime < 0f)
+                    continue;
+
+                float elapsed = Time.time - ball.FadeStartTime;
+                if (elapsed >= _fadeOutDuration)
+                {
+                    // Can't dequeue from middle of ring buffer, just destroy GO
+                    if (ball.Go != null)
+                        Destroy(ball.Go);
+                    ball.Go = null;
+                    ball.Renderer = null;
+                    // It will be cleaned up when it reaches the head
+                }
+                else
+                {
+                    float t = elapsed / _fadeOutDuration;
+                    float newOpacity = Mathf.Lerp(ball.BaseOpacity, 0f, t);
+
+                    if (ball.Renderer != null)
+                    {
+                        ball.PropBlock.SetFloat(_idOpacity, newOpacity);
+                        ball.Renderer.SetPropertyBlock(ball.PropBlock);
+                    }
+                }
+            }
+
+            // Phase 4: Clean up destroyed entries at the head
+            while (_tempCount > 0 && _tempRing[_tempHead].Go == null)
+            {
+                if (_tempRing[_tempHead].FadeStartTime >= 0f)
+                    _tempFadingCount--;
+
+                _tempRing[_tempHead] = default;
+                _tempHead = (_tempHead + 1) % RingBufferCapacity;
+                _tempCount--;
+            }
+        }
+
+        private void ForceDestroyOldestTemporary()
+        {
+            if (_tempCount <= 0) return;
+
+            ref var ball = ref _tempRing[_tempHead];
+            if (ball.Go != null)
+                Destroy(ball.Go);
+
+            if (ball.FadeStartTime >= 0f)
+                _tempFadingCount--;
+
+            ball = default;
+            _tempHead = (_tempHead + 1) % RingBufferCapacity;
+            _tempCount--;
+        }
+
         // ─── Queries ─────────────────────────────────────────────────────
 
-        /// <summary>Returns a flat list of all spawned point GameObjects across all fingers.</summary>
+        /// <summary>Returns a flat list of all spawned permanent point GameObjects across all fingers.</summary>
         public List<GameObject> GetAllPoints()
         {
             var all = new List<GameObject>();
@@ -237,7 +478,7 @@ namespace FingerPaint
             return all;
         }
 
-        /// <summary>Total number of spawned points.</summary>
+        /// <summary>Total number of permanent spawned points.</summary>
         public int TotalPointCount
         {
             get
@@ -249,9 +490,13 @@ namespace FingerPaint
             }
         }
 
-        /// <summary>Clears all painted points.</summary>
+        /// <summary>Number of temporary balls currently in the scene.</summary>
+        public int TemporaryBallCount => _tempCount;
+
+        /// <summary>Clears all painted points (both permanent and temporary).</summary>
         public void ClearAll()
         {
+            // Clear permanent balls
             for (int i = 0; i < HandTrackingManager.FingerCount; i++)
             {
                 foreach (var go in PointsByFinger[i])
@@ -261,6 +506,21 @@ namespace FingerPaint
                 }
                 PointsByFinger[i].Clear();
                 _lastSpawnPos[i] = Vector3.positiveInfinity;
+            }
+
+            // Clear temporary balls
+            if (_tempRing != null)
+            {
+                for (int i = 0; i < _tempCount; i++)
+                {
+                    int idx = (_tempHead + i) % RingBufferCapacity;
+                    if (_tempRing[idx].Go != null)
+                        Destroy(_tempRing[idx].Go);
+                    _tempRing[idx] = default;
+                }
+                _tempHead = 0;
+                _tempCount = 0;
+                _tempFadingCount = 0;
             }
         }
 
