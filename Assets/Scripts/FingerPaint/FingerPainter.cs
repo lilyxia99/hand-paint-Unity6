@@ -223,8 +223,6 @@ namespace FingerPaint
                 SpawnPoint(i, finger.TipPosition);
                 _lastSpawnPos[i] = finger.TipPosition;
             }
-
-            UpdateIdleTrailFade();
         }
 
         // ─── Dual mode: temporary when silent, permanent when speaking ──
@@ -253,7 +251,6 @@ namespace FingerPaint
             }
 
             UpdateTemporaryBalls();
-            UpdateIdleTrailFade();
         }
 
         private void OnValidate()

@@ -150,7 +150,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::FingerPaint.HandMeshVisualizer
   _leftHandPrefab: {fileID: 773853689519989575, guid: b3ed8a0a703ebd34a9e44ed3d9f1fcf6, type: 3}
   _rightHandPrefab: {fileID: 3133494152545806682, guid: 3f7511fbc40ae7a4b89c3298a3de199d, type: 3}
-  _handMaterial: {fileID: 2100000, guid: 613690cd962241049a0ec289a6ff835e, type: 2}
+  _handMaterial: {fileID: 2100000, guid: 0a8bae9b1d46f0448980249e69b899ba, type: 2}
   _showHands: 1
 --- !u!4 &6977855
 Transform:
@@ -623,6 +623,10 @@ MonoBehaviour:
   _fadeOutDuration: 1.5
   _tempBallColor: {r: 0.6, g: 0.6, b: 0.8, a: 1}
   _tempBallOpacity: 0.25
+  _idleFadeDelay: 1
+  _idleFadeCount: 5
+  _trailFadeDuration: 1.5
+  _stillThreshold: 0.003
 --- !u!114 &1128206444
 MonoBehaviour:
   m_ObjectHideFlags: 0
