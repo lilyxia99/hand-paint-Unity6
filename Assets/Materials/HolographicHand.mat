@@ -98,7 +98,7 @@ Material:
     - _AddPrecomputedVelocity: 0
     - _AlphaClip: 0
     - _AlphaToMask: 0
-    - _AnimSpeed: 0.8
+    - _AnimSpeed: 1
     - _Blend: 0
     - _BlendModePreserveSpecular: 1
     - _BumpScale: 1
@@ -108,18 +108,19 @@ Material:
     - _Cutoff: 0.5
     - _DetailAlbedoMapScale: 1
     - _DetailNormalMapScale: 1
-    - _DotDensity: 229
+    - _DotDensity: 198
     - _DotMinBright: 0.505
-    - _DotSize: 0.5
+    - _DotSize: 0.192
     - _DstBlend: 0
     - _DstBlendAlpha: 0
+    - _EdgeConcentration: 0.88
     - _EnvironmentReflections: 1
-    - _FresnelBright: 2
-    - _FresnelPow: 2.77
+    - _FresnelBright: 4.64
+    - _FresnelPow: 4.28
     - _GlossMapScale: 0
     - _Glossiness: 0
     - _GlossyReflections: 0
-    - _Intensity: 5
+    - _Intensity: 19.7
     - _Metallic: 0
     - _OcclusionStrength: 1
     - _Parallax: 0.005
@@ -127,8 +128,8 @@ Material:
     - _ReceiveShadows: 1
     - _Smoothness: 0.5
     - _SmoothnessTextureChannel: 0
-    - _SparkleRate: 2
-    - _SparkleScale: 3.05
+    - _SparkleRate: 2.41
+    - _SparkleScale: 3.24
     - _SparkleSize: 0.079
     - _SpecularHighlights: 1
     - _SrcBlend: 1

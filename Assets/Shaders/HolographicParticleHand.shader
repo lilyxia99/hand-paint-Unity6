@@ -21,9 +21,9 @@ Shader "FingerPaint/Holographic Particle Hand"
         _SparkleRate  ("Sparkle Flash Speed",        Range(0.5, 5)) = 2.0
 
         [Header(Edge Concentration)]
-        _EdgeConcentration ("Edge vs Center", Range(0, 1)) = 0.65
-        _FresnelPow   ("Fresnel Power",          Range(0.5, 8)) = 2.5
-        _FresnelBright ("Edge Dot Boost",         Range(0, 5))  = 2.5
+        _EdgeConcentration ("Edge vs Center", Range(0, 1)) = 0.88
+        _FresnelPow   ("Fresnel Power",          Range(0.2, 5)) = 1.0
+        _FresnelBright ("Edge Dot Boost",         Range(0, 5))  = 3.0
 
         [Header(Animation)]
         _AnimSpeed     ("Animation Speed",        Range(0, 3))    = 0.8
@@ -140,35 +140,44 @@ Shader "FingerPaint/Holographic Particle Hand"
             {
                 UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(i);
 
-                // ── Fresnel first — drives edge concentration ──────
+                // ── Edge detection (two methods combined) ──────────
 
-                half3 N       = normalize(i.normalWS);
-                half3 V       = normalize(i.viewDirWS);
-                half  fresnel = pow(1.0 - saturate(dot(N, V)), _FresnelPow);
+                half3 N = normalize(i.normalWS);
+                half3 V = normalize(i.viewDirWS);
 
-                // edgeFactor: 1.0 at silhouette edge, (1-_EdgeConcentration) at center
-                // Controls how much dots concentrate toward edges
-                half edgeFactor = lerp(1.0 - _EdgeConcentration, 1.0, saturate(fresnel));
+                // 1) Fresnel: silhouette edge — like toon outline, always on rim
+                half fresnel = pow(1.0 - saturate(dot(N, V)), _FresnelPow);
 
-                // Size scale: dots are bigger at edges, smaller at center
-                half sizeEdge = lerp(0.35, 1.4, edgeFactor);
+                // 2) Geometric edge: screen-space normal change detects creases,
+                //    finger gaps, knuckles — works even looking head-on at palm
+                half geomEdge = saturate(length(fwidth(N)) * 12.0);
+
+                // Combine: whichever detects an edge wins
+                half edge = saturate(max(fresnel, geomEdge));
+
+                // ── Edge-driven dot control ────────────────────────
+                // killThreshold: high at center → kills most dots,
+                //                zero at edge  → all dots survive
+                half killThreshold = _EdgeConcentration * (1.0 - edge);
+
+                // edgeBright: dim at center, full at edge
+                half edgeBright = lerp(1.0 - _EdgeConcentration, 1.0, edge);
 
                 // ── Layer 1: Primary particle dots ──────────────────
 
                 float3 p1     = i.positionOS * _DotDensity;
                 float3 cellId = floor(p1);
                 float3 cellFr = frac(p1);
+                float3 pt1    = Hash33(cellId) * 0.8 + 0.1;
+                half   dist1  = length(cellFr - pt1);
 
-                float3 pt1   = Hash33(cellId) * 0.8 + 0.1;
-                half   dist1 = length(cellFr - pt1);
-
-                // Dot size scales with edge: bigger at silhouette
-                half dot1  = 1.0 - smoothstep(0.0, _DotSize * sizeEdge, dist1);
+                half dot1  = 1.0 - smoothstep(0.0, _DotSize, dist1);
                 dot1 = pow(dot1, 1.4);
 
                 half rand1 = Hash13(cellId);
                 dot1 *= lerp(_DotMinBright, 1.0, rand1);
-                dot1 *= edgeFactor;                              // dim center dots
+                dot1 *= step(killThreshold, rand1);   // kill center dots
+                dot1 *= edgeBright;                    // dim survivors at center
 
                 // ── Layer 2: Sparkle overlay (smaller, flashing) ────
 
@@ -177,25 +186,28 @@ Shader "FingerPaint/Holographic Particle Hand"
                 float3 fr2  = frac(p2);
                 float3 pt2  = Hash33(id2) * 0.8 + 0.1;
                 half   dist2 = length(fr2 - pt2);
-                half   dot2  = 1.0 - smoothstep(0.0, _SparkleSize * sizeEdge, dist2);
+                half   dot2  = 1.0 - smoothstep(0.0, _SparkleSize, dist2);
                 dot2 = pow(dot2, 1.4);
 
-                half flash = Hash13(id2 + floor(_Time.y * _SparkleRate));
+                half rand2 = Hash13(id2);
+                half flash  = Hash13(id2 + floor(_Time.y * _SparkleRate));
                 dot2 *= step(0.35, flash);
-                dot2 *= edgeFactor;
+                dot2 *= step(killThreshold, rand2);    // kill center sparkles
+                dot2 *= edgeBright;
 
-                // ── Layer 3: Mid-fill dots (fills gaps between L1) ──
+                // ── Layer 3: Mid-fill dots (fills gaps) ─────────────
 
                 float3 p3   = i.positionOS * _DotDensity * 0.65 + 37.3;
                 float3 id3  = floor(p3);
                 float3 fr3  = frac(p3);
                 float3 pt3  = Hash33(id3) * 0.8 + 0.1;
                 half   dist3 = length(fr3 - pt3);
-                half   dot3  = 1.0 - smoothstep(0.0, _DotSize * 0.75 * sizeEdge, dist3);
+                half   dot3  = 1.0 - smoothstep(0.0, _DotSize * 0.75, dist3);
                 dot3 = pow(dot3, 1.4);
                 half rand3 = Hash13(id3);
                 dot3 *= lerp(_DotMinBright, 1.0, rand3);
-                dot3 *= edgeFactor;
+                dot3 *= step(killThreshold, rand3);    // kill center fill
+                dot3 *= edgeBright;
 
                 // Combined dot mask — edge-concentrated
                 half dotMask = saturate(dot1 + dot2 * 0.8 + dot3 * 0.55);
@@ -203,14 +215,13 @@ Shader "FingerPaint/Holographic Particle Hand"
                 // ── Color mixing ────────────────────────────────────
 
                 half  mixRand = saturate(rand1 + rand3 * 0.3);
-                half  colorT  = saturate(fresnel * 0.5 + mixRand * 0.4);
+                half  colorT  = saturate(edge * 0.5 + mixRand * 0.4);
                 half3 color   = lerp(_ColorCore.rgb, _ColorAccent.rgb, colorT);
 
-                // Cyan/white highlights — more at edges
                 color = lerp(color, _ColorHighlight.rgb, step(0.78, mixRand) * 0.6);
 
                 // Edge glow boost on top of concentration
-                color *= _Intensity * (1.0 + fresnel * _FresnelBright);
+                color *= _Intensity * (1.0 + edge * _FresnelBright);
 
                 // ── Final alpha: ONLY from dots ─────────────────────
 
