@@ -86,6 +86,21 @@ namespace FingerPaint
         [Tooltip("Opacity for temporary (silent) balls.")]
         [SerializeField] [Range(0f, 1f)] private float _tempBallOpacity = 0.25f;
 
+        // ─── Idle trail fade settings ──────────────────────────────────
+
+        [Header("Idle Trail Fade")]
+        [Tooltip("Seconds of inactivity (no voice + hand still) before trailing balls fade.")]
+        [SerializeField] private float _idleFadeDelay = 1.0f;
+
+        [Tooltip("Number of trailing balls per finger that fade when idle.")]
+        [SerializeField] private int _idleFadeCount = 5;
+
+        [Tooltip("Duration of the trail fade shrink + disappear (seconds).")]
+        [SerializeField] private float _trailFadeDuration = 1.5f;
+
+        [Tooltip("Per-frame movement threshold below which the hand is 'still' (meters).")]
+        [SerializeField] private float _stillThreshold = 0.003f;
+
         // ─── Runtime state ───────────────────────────────────────────────
 
         /// <summary>Per-finger list of spawned permanent GameObjects (spheres).</summary>
@@ -94,6 +109,24 @@ namespace FingerPaint
         private Vector3[] _lastSpawnPos;
         private Material[] _fingerMaterials;
         private Mesh _sharedSphereMesh;
+
+        // ─── Idle trail fade state ───────────────────────────────────────
+
+        private float[] _fingerIdleTime;
+        private Vector3[] _prevFramePos;
+        private bool[] _trailFadeTriggered;
+
+        private struct TrailFadeEntry
+        {
+            public GameObject Go;
+            public MeshRenderer Renderer;
+            public MaterialPropertyBlock PropBlock;
+            public float FadeStartTime;
+            public int FingerIndex;
+            public Vector3 OriginalScale;
+        }
+
+        private List<TrailFadeEntry> _trailFading;
 
         // ─── MaterialPropertyBlock for voice brush per-spawn overrides ──
         private MaterialPropertyBlock _propBlock;
@@ -142,6 +175,14 @@ namespace FingerPaint
             _tempCount = 0;
             _tempFadingCount = 0;
 
+            // Initialize idle trail fade state
+            _fingerIdleTime = new float[HandTrackingManager.FingerCount];
+            _prevFramePos = new Vector3[HandTrackingManager.FingerCount];
+            _trailFadeTriggered = new bool[HandTrackingManager.FingerCount];
+            for (int i = 0; i < HandTrackingManager.FingerCount; i++)
+                _prevFramePos[i] = Vector3.positiveInfinity;
+            _trailFading = new List<TrailFadeEntry>();
+
             BuildSharedMesh();
             BuildMaterials();
         }
@@ -182,6 +223,8 @@ namespace FingerPaint
                 SpawnPoint(i, finger.TipPosition);
                 _lastSpawnPos[i] = finger.TipPosition;
             }
+
+            UpdateIdleTrailFade();
         }
 
         // ─── Dual mode: temporary when silent, permanent when speaking ──
@@ -210,6 +253,7 @@ namespace FingerPaint
             }
 
             UpdateTemporaryBalls();
+            UpdateIdleTrailFade();
         }
 
         private void OnValidate()
@@ -467,6 +511,148 @@ namespace FingerPaint
             _tempCount--;
         }
 
+        // ─── Idle trail fade ──────────────────────────────────────────────
+
+        /// <summary>
+        /// Per-finger idle detection: when voice is off and the hand is still
+        /// for _idleFadeDelay seconds, start fading the last N balls.
+        /// Uses shrink + opacity fade so it works with any material/shader.
+        /// </summary>
+        private void UpdateIdleTrailFade()
+        {
+            // Only relevant when voice is part of the trigger
+            if (_voiceDetector == null)
+            {
+                UpdateTrailFadeBalls();
+                return;
+            }
+
+            bool voiceActive = _voiceDetector.IsActive;
+
+            for (int i = 0; i < HandTrackingManager.FingerCount; i++)
+            {
+                ref var finger = ref _handTracking.Fingers[i];
+
+                if (!finger.IsTracked)
+                {
+                    _fingerIdleTime[i] = 0f;
+                    _trailFadeTriggered[i] = false;
+                    _prevFramePos[i] = Vector3.positiveInfinity;
+                    continue;
+                }
+
+                // Detect per-frame hand movement
+                float movement = (_prevFramePos[i].x < float.MaxValue)
+                    ? Vector3.Distance(finger.TipPosition, _prevFramePos[i])
+                    : 0f;
+                _prevFramePos[i] = finger.TipPosition;
+
+                bool isStill = movement < _stillThreshold;
+                bool isIdle = !voiceActive && isStill;
+
+                if (isIdle)
+                {
+                    _fingerIdleTime[i] += Time.deltaTime;
+
+                    if (_fingerIdleTime[i] >= _idleFadeDelay && !_trailFadeTriggered[i])
+                    {
+                        StartTrailFadeForFinger(i);
+                        _trailFadeTriggered[i] = true;
+                    }
+                }
+                else
+                {
+                    _fingerIdleTime[i] = 0f;
+                    _trailFadeTriggered[i] = false;
+                }
+            }
+
+            UpdateTrailFadeBalls();
+        }
+
+        /// <summary>
+        /// Marks the last N permanent balls for a given finger to begin trail-fading.
+        /// </summary>
+        private void StartTrailFadeForFinger(int fingerIndex)
+        {
+            var points = PointsByFinger[fingerIndex];
+            int count = Mathf.Min(_idleFadeCount, points.Count);
+            if (count <= 0) return;
+
+            for (int j = points.Count - count; j < points.Count; j++)
+            {
+                var go = points[j];
+                if (go == null) continue;
+
+                // Skip if already in the fade list
+                bool alreadyFading = false;
+                for (int k = 0; k < _trailFading.Count; k++)
+                {
+                    if (_trailFading[k].Go == go)
+                    {
+                        alreadyFading = true;
+                        break;
+                    }
+                }
+                if (alreadyFading) continue;
+
+                var renderer = go.GetComponent<MeshRenderer>();
+                if (renderer == null) continue;
+
+                var propBlock = new MaterialPropertyBlock();
+                renderer.GetPropertyBlock(propBlock);
+
+                _trailFading.Add(new TrailFadeEntry
+                {
+                    Go = go,
+                    Renderer = renderer,
+                    PropBlock = propBlock,
+                    FadeStartTime = Time.time,
+                    FingerIndex = fingerIndex,
+                    OriginalScale = go.transform.localScale
+                });
+            }
+        }
+
+        /// <summary>
+        /// Updates all trail-fading balls: shrinks them toward zero and reduces
+        /// opacity. When fully faded, destroys the GameObject and removes it
+        /// from PointsByFinger.
+        /// </summary>
+        private void UpdateTrailFadeBalls()
+        {
+            for (int i = _trailFading.Count - 1; i >= 0; i--)
+            {
+                var entry = _trailFading[i];
+
+                if (entry.Go == null)
+                {
+                    _trailFading.RemoveAt(i);
+                    continue;
+                }
+
+                float elapsed = Time.time - entry.FadeStartTime;
+                float t = Mathf.Clamp01(elapsed / _trailFadeDuration);
+
+                if (t >= 1f)
+                {
+                    // Fully faded — destroy and remove from permanent list
+                    PointsByFinger[entry.FingerIndex].Remove(entry.Go);
+                    Destroy(entry.Go);
+                    _trailFading.RemoveAt(i);
+                }
+                else
+                {
+                    // Shrink + reduce opacity
+                    float fade = 1f - t;
+                    entry.Go.transform.localScale = entry.OriginalScale * fade;
+
+                    entry.PropBlock.SetFloat(_idOpacity, fade);
+                    entry.Renderer.SetPropertyBlock(entry.PropBlock);
+                }
+            }
+        }
+
         // ─── Queries ─────────────────────────────────────────────────────
 
         /// <summary>Returns a flat list of all spawned permanent point GameObjects across all fingers.</summary>
@@ -506,6 +692,17 @@ namespace FingerPaint
                 }
                 PointsByFinger[i].Clear();
                 _lastSpawnPos[i] = Vector3.positiveInfinity;
+            }
+
+            // Clear trail fade entries
+            if (_trailFading != null)
+            {
+                _trailFading.Clear();
+                for (int i = 0; i < HandTrackingManager.FingerCount; i++)
+                {
+                    _fingerIdleTime[i] = 0f;
+                    _trailFadeTriggered[i] = false;
+                }
             }
 
             // Clear temporary balls
