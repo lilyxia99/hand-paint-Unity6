@@ -177,10 +177,47 @@ namespace FingerPaint
                 Debug.LogWarning("[HandAnimationPlayer] No SkinnedMeshRenderer found on hand prefab!");
             }
 
-            // Add Animator and assign the controller
-            _animator = _handInstance.GetComponent<Animator>();
+            // ── Determine the animation root ─────────────────────────────────
+            // The Meta recorder (HandAnimationRecorder / DualHandAnimationRecorder)
+            // writes curve paths relative to HandVisual.Root. Crucially,
+            // HandVisual.Root is the PARENT of the wrist bone, not the wrist
+            // itself. So recorded paths look like:
+            //   path ""                              → HandVisual.Root (parent of wrist)
+            //   path "XRHand_Wrist"                  → the wrist bone
+            //   path "XRHand_Wrist/XRHand_Palm"      → palm under wrist
+            //   path "XRHand_Wrist/XRHand_ThumbMeta…" → finger bones
+            //
+            // SkinnedMeshRenderer.rootBone points to XRHand_Wrist (the wrist
+            // bone itself), so we go one level UP to its parent to match
+            // HandVisual.Root. The Animator must sit there for all curve
+            // paths to resolve correctly.
+            Transform animRoot = _handInstance.transform;
+            if (smr != null && smr.rootBone != null)
+            {
+                // smr.rootBone = XRHand_Wrist; we need its parent = HandVisual.Root
+                if (smr.rootBone.parent != null)
+                {
+                    animRoot = smr.rootBone.parent;
+                    Debug.Log($"[HandAnimationPlayer] Animation root: \"{animRoot.name}\" " +
+                              $"(parent of rootBone \"{smr.rootBone.name}\")");
+                }
+                else
+                {
+                    animRoot = smr.rootBone;
+                    Debug.LogWarning($"[HandAnimationPlayer] rootBone \"{smr.rootBone.name}\" has no parent — " +
+                                     "using it directly. Finger curves may not resolve.");
+                }
+            }
+            else
+            {
+                Debug.LogWarning("[HandAnimationPlayer] No rootBone found — Animator will be on the prefab root. " +
+                                 "Finger curves may not resolve if they were recorded relative to a child bone.");
+            }
+
+            // Add Animator on the animation root (not the prefab root)
+            _animator = animRoot.GetComponent<Animator>();
             if (_animator == null)
-                _animator = _handInstance.AddComponent<Animator>();
+                _animator = animRoot.gameObject.AddComponent<Animator>();
 
             _animator.runtimeAnimatorController = _animatorController;
 
@@ -194,7 +231,8 @@ namespace FingerPaint
             // Force evaluate frame 0 so the hand snaps to its starting pose.
             _animator.Update(0f);
 
-            Debug.Log($"[HandAnimationPlayer] Playback ready: {_handInstance.name} with {_animatorController.name} (loop={_loop})");
+            Debug.Log($"[HandAnimationPlayer] Playback ready: {_handInstance.name} with {_animatorController.name} " +
+                      $"(loop={_loop}, animRoot={animRoot.name})");
         }
 
         // ─── Helpers ────────────────────────────────────────────────────
