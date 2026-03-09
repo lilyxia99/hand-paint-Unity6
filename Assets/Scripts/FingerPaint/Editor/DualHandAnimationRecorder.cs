@@ -1,0 +1,503 @@
+/*
+ * DualHandAnimationRecorder — records BOTH hands simultaneously into
+ * two separate AnimationClips with synchronized timestamps.
+ *
+ * Based on Meta's HandAnimationRecorder pattern but extended for dual-hand
+ * recording and dual-ghost preview.
+ *
+ * Menu: Meta/Interaction/Dual Hand Animation Recorder
+ */
+
+using Oculus.Interaction;
+using Oculus.Interaction.HandGrab.Editor;
+using Oculus.Interaction.HandGrab.Visuals;
+using Oculus.Interaction.Input;
+using Oculus.Interaction.Utils;
+using System.Collections.Generic;
+using UnityEditor;
+using UnityEngine;
+
+namespace FingerPaint.Editor
+{
+    public class DualHandAnimationRecorder : EditorWindow
+    {
+        // ─── Hand Visual References ─────────────────────────────────────
+        [SerializeField] private HandVisual _leftHandVisual;
+        [SerializeField] private HandVisual _rightHandVisual;
+
+        // ─── Recording Settings ─────────────────────────────────────────
+        [SerializeField] private string _handLeftPrefix = "_l_";
+        [SerializeField] private string _handRightPrefix = "_r_";
+
+        [SerializeField]
+        private HandFingerJointFlags _includedJoints =
+#if ISDK_OPENXR_HAND
+            HandFingerJointFlags.All;
+#else
+            HandFingerJointFlags.HandMaxSkinnable - 1;
+#endif
+
+        [SerializeField] private bool _includeJointPosition = true;
+        [SerializeField] private int _framerate = 30;
+        [SerializeField] private float _slopeRotationThreshold = 0.1f;
+        [SerializeField] private float _slopePositionThreshold = 0.0005f;
+
+        // ─── Output Settings ────────────────────────────────────────────
+        [SerializeField] private string _folder = "GeneratedAnimations";
+        [SerializeField] private string _clipBaseName = "HandAnimation";
+        [SerializeField] private KeyCode _recordKey = KeyCode.Space;
+
+        // ─── Ghost Preview ──────────────────────────────────────────────
+        [SerializeField] private HandGhostProvider _ghostProvider;
+#if ISDK_OPENXR_HAND
+        [SerializeField] private HandGhostProvider _handGhostProvider;
+#endif
+
+        private HandGhostProvider GhostProvider
+        {
+#if ISDK_OPENXR_HAND
+            get => _handGhostProvider;
+#else
+            get => _ghostProvider;
+#endif
+        }
+
+        // ─── Recorded Clips ─────────────────────────────────────────────
+        [SerializeField] private AnimationClip _leftClip;
+        [SerializeField] private AnimationClip _rightClip;
+
+        // ─── Recording State ────────────────────────────────────────────
+        private JointRecord[] _leftJointRecords;
+        private JointRecord _leftRootRecord;
+        private JointRecord[] _rightJointRecords;
+        private JointRecord _rightRootRecord;
+        private float _startTime;
+        private bool _isRecording;
+
+        // ─── Preview State ──────────────────────────────────────────────
+        private HandGhost _leftGhost;
+        private HandGhost _rightGhost;
+        private bool _showMin = true;
+        private float _trimMin = 0f;
+        private float _trimMax = 1f;
+        private bool _forceUpdateGhosts = true;
+
+        // ─── UI State ───────────────────────────────────────────────────
+        private GUIStyle _richTextStyle;
+        private Vector2 _scrollPos = Vector2.zero;
+
+        // ═══════════════════════════════════════════════════════════════
+        // Menu
+        // ═══════════════════════════════════════════════════════════════
+
+        [MenuItem("Meta/Interaction/Dual Hand Animation Recorder")]
+        private static void CreateWizard()
+        {
+            var window = GetWindow<DualHandAnimationRecorder>();
+            window.titleContent = new GUIContent("Dual Hand Recorder");
+            window.Show();
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // Lifecycle
+        // ═══════════════════════════════════════════════════════════════
+
+        private void OnEnable()
+        {
+            _richTextStyle = EditorGUIUtility.GetBuiltinSkin(
+                EditorGUIUtility.isProSkin ? EditorSkin.Scene : EditorSkin.Inspector).label;
+            _richTextStyle.richText = true;
+            _richTextStyle.wordWrap = true;
+
+            if (_ghostProvider == null)
+                HandGhostProviderUtils.TryGetDefaultProvider(out _ghostProvider);
+
+            _forceUpdateGhosts = true;
+        }
+
+        private void OnDisable()
+        {
+            if (_isRecording)
+                StopRecording();
+
+            DestroyGhosts();
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // GUI
+        // ═══════════════════════════════════════════════════════════════
+
+        private void OnGUI()
+        {
+            // ── Keyboard shortcut ────────────────────────────────────
+            Event e = Event.current;
+            if (e.type == EventType.KeyDown && e.keyCode == _recordKey)
+            {
+                if (!_isRecording) StartRecording();
+                else StopRecording();
+                e.Use();
+            }
+
+            GUILayout.Label(
+                "Record <b>both hands simultaneously</b> during <b>Play Mode</b>.\n" +
+                "Outputs two synchronized Animation Clips (left + right).",
+                _richTextStyle);
+
+            _scrollPos = GUILayout.BeginScrollView(_scrollPos);
+
+            // ── Hand Visual assignments ──────────────────────────────
+            GUILayout.Space(10);
+            GUILayout.Label("<b>Hand Visuals</b> (drag from scene hierarchy):", _richTextStyle);
+            HandAnimationUtils.GenerateObjectField(ref _leftHandVisual, "Left Hand Visual");
+            HandAnimationUtils.GenerateObjectField(ref _rightHandVisual, "Right Hand Visual");
+
+            bool hasLeft = _leftHandVisual != null;
+            bool hasRight = _rightHandVisual != null;
+            if (!hasLeft && !hasRight)
+            {
+                EditorGUILayout.HelpBox(
+                    "Assign at least one HandVisual. For dual recording, assign both.",
+                    MessageType.Warning);
+            }
+
+            // ── Recording settings ───────────────────────────────────
+            GUILayout.Space(10);
+            _includedJoints = (HandFingerJointFlags)EditorGUILayout.EnumFlagsField("Record Joints", _includedJoints);
+            _includeJointPosition = EditorGUILayout.Toggle("Include Position", _includeJointPosition);
+            _framerate = EditorGUILayout.IntField("Animation framerate", _framerate);
+            _slopeRotationThreshold = EditorGUILayout.FloatField("Rotation compression delta", _slopeRotationThreshold);
+            _slopePositionThreshold = EditorGUILayout.FloatField("Translation compression delta", _slopePositionThreshold);
+            _handLeftPrefix = EditorGUILayout.TextField("Left prefix", _handLeftPrefix);
+            _handRightPrefix = EditorGUILayout.TextField("Right prefix", _handRightPrefix);
+
+            // ── Output settings ──────────────────────────────────────
+            GUILayout.Space(10);
+            GUILayout.Label("Output location:", _richTextStyle);
+            _folder = EditorGUILayout.TextField("Assets sub-folder", _folder);
+            _clipBaseName = EditorGUILayout.TextField("Base name", _clipBaseName);
+
+            if (hasLeft || hasRight)
+            {
+                string preview = "";
+                if (hasLeft) preview += $"  Left:  {_clipBaseName}_Left.anim\n";
+                if (hasRight) preview += $"  Right: {_clipBaseName}_Right.anim";
+                EditorGUILayout.HelpBox($"Will generate:\n{preview}", MessageType.Info);
+            }
+
+            // ── Record button ────────────────────────────────────────
+            GUILayout.Space(10);
+            GUILayout.BeginHorizontal();
+            GUILayout.Label("Start/stop key:", _richTextStyle);
+            _recordKey = (KeyCode)EditorGUILayout.EnumPopup(_recordKey);
+            GUILayout.EndHorizontal();
+
+            GUI.backgroundColor = _isRecording ? new Color(1f, 0.4f, 0.4f) : Color.white;
+            string btnLabel = _isRecording ? "■  Stop Recording" : "●  Start Recording";
+            if (GUILayout.Button(btnLabel, GUILayout.Height(60)))
+            {
+                if (!_isRecording) StartRecording();
+                else StopRecording();
+            }
+            GUI.backgroundColor = Color.white;
+
+            if (_isRecording)
+            {
+                float elapsed = Time.time - _startTime;
+                EditorGUILayout.HelpBox($"Recording... {elapsed:F1}s elapsed", MessageType.None);
+                Repaint(); // Keep updating the elapsed time display
+            }
+
+            // ── Ghost Provider ────────────────────────────────────────
+            GUILayout.Space(10);
+            GUILayout.Label("Ghost provider for preview:", _richTextStyle);
+#if ISDK_OPENXR_HAND
+            if (HandAnimationUtils.GenerateObjectField(ref _handGhostProvider))
+#else
+            if (HandAnimationUtils.GenerateObjectField(ref _ghostProvider))
+#endif
+            {
+                _forceUpdateGhosts = true;
+                HandGhostProviderUtils.SetLastDefaultProvider(GhostProvider);
+            }
+
+            // ── Recorded clips ───────────────────────────────────────
+            GUILayout.Space(10);
+            GUILayout.Label("<b>Recorded animations:</b>", _richTextStyle);
+            _forceUpdateGhosts |= HandAnimationUtils.GenerateObjectField(ref _leftClip, "Left Clip");
+            _forceUpdateGhosts |= HandAnimationUtils.GenerateObjectField(ref _rightClip, "Right Clip");
+
+            // ── Preview / Trim ───────────────────────────────────────
+            bool hasAnyClip = _leftClip != null || _rightClip != null;
+            if (hasAnyClip)
+            {
+                GUILayout.Space(5);
+                GUILayout.Label("Preview and Trim (both clips together):");
+                GUILayout.BeginHorizontal();
+
+                float prevMin = _trimMin;
+                float prevMax = _trimMax;
+                EditorGUILayout.MinMaxSlider(ref _trimMin, ref _trimMax, 0f, 1f);
+                _showMin = (prevMin != _trimMin) || (_showMin && prevMax == _trimMax);
+
+                if (GUILayout.Button("Trim Both", GUILayout.Height(20)))
+                {
+                    if (_leftClip != null)
+                        HandAnimationUtils.Trim(ref _leftClip, _trimMin, _trimMax);
+                    if (_rightClip != null)
+                        HandAnimationUtils.Trim(ref _rightClip, _trimMin, _trimMax);
+                    _trimMin = 0f;
+                    _trimMax = 1f;
+                }
+                GUILayout.EndHorizontal();
+
+                // ── Mirror buttons ───────────────────────────────────
+                GUILayout.Space(5);
+                GUILayout.BeginHorizontal();
+                if (_leftClip != null && GUILayout.Button("Mirror Left → Right"))
+                    MirrorClip(_leftClip);
+                if (_rightClip != null && GUILayout.Button("Mirror Right → Left"))
+                    MirrorClip(_rightClip);
+                GUILayout.EndHorizontal();
+
+                // ── Update ghosts ────────────────────────────────────
+                float time = _showMin ? _trimMin : _trimMax;
+                UpdateGhosts(time, _forceUpdateGhosts);
+            }
+            else
+            {
+                DestroyGhosts();
+            }
+
+            _forceUpdateGhosts = false;
+            GUILayout.EndScrollView();
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // Recording
+        // ═══════════════════════════════════════════════════════════════
+
+        private void StartRecording()
+        {
+            if (_isRecording) return;
+            if (_leftHandVisual == null && _rightHandVisual == null)
+            {
+                Debug.LogError("[DualHandRecorder] No HandVisual assigned!");
+                return;
+            }
+
+            _isRecording = true;
+            _startTime = Time.time;
+
+            if (_leftHandVisual != null)
+            {
+                InitializeRecords(_leftHandVisual, out _leftJointRecords, out _leftRootRecord);
+                _leftHandVisual.WhenHandVisualUpdated += HandleLeftHandUpdated;
+            }
+
+            if (_rightHandVisual != null)
+            {
+                InitializeRecords(_rightHandVisual, out _rightJointRecords, out _rightRootRecord);
+                _rightHandVisual.WhenHandVisualUpdated += HandleRightHandUpdated;
+            }
+
+            int count = (_leftHandVisual != null ? 1 : 0) + (_rightHandVisual != null ? 1 : 0);
+            Debug.Log($"[DualHandRecorder] *** RECORDING {count} HAND(S) *** Move your hands!");
+        }
+
+        private void StopRecording()
+        {
+            if (!_isRecording) return;
+            _isRecording = false;
+
+            if (_leftHandVisual != null)
+            {
+                _leftHandVisual.WhenHandVisualUpdated -= HandleLeftHandUpdated;
+                _leftClip = GenerateClipAsset($"{_clipBaseName}_Left", _leftRootRecord, _leftJointRecords);
+                Debug.Log($"[DualHandRecorder] Left clip saved: {_leftClip.length:F2}s, {_leftClip.frameRate}fps");
+            }
+
+            if (_rightHandVisual != null)
+            {
+                _rightHandVisual.WhenHandVisualUpdated -= HandleRightHandUpdated;
+                _rightClip = GenerateClipAsset($"{_clipBaseName}_Right", _rightRootRecord, _rightJointRecords);
+                Debug.Log($"[DualHandRecorder] Right clip saved: {_rightClip.length:F2}s, {_rightClip.frameRate}fps");
+            }
+
+            Debug.Log("[DualHandRecorder] *** RECORDING STOPPED ***");
+            _forceUpdateGhosts = true;
+        }
+
+        // ─── Per-hand update callbacks ───────────────────────────────
+
+        private void HandleLeftHandUpdated()
+        {
+            float time = Time.time - _startTime;
+            ReadPoses(time, _leftHandVisual, _leftJointRecords, _leftRootRecord);
+        }
+
+        private void HandleRightHandUpdated()
+        {
+            float time = Time.time - _startTime;
+            ReadPoses(time, _rightHandVisual, _rightJointRecords, _rightRootRecord);
+        }
+
+        // ─── Shared recording logic ─────────────────────────────────
+
+        private void InitializeRecords(HandVisual handVisual,
+            out JointRecord[] jointRecords, out JointRecord rootRecord)
+        {
+            jointRecords = new JointRecord[(int)HandJointId.HandEnd];
+            Transform root = handVisual.Root;
+            foreach (HandJointId jointId in IncludedJointIds())
+            {
+                Transform jointTransform = handVisual.GetTransformByHandJointId(jointId);
+                string path = HandAnimationUtils.GetGameObjectPath(jointTransform, root);
+                jointRecords[(int)jointId] = new JointRecord(jointId, path);
+            }
+            rootRecord = new JointRecord(HandJointId.Invalid, "");
+        }
+
+        private void ReadPoses(float time, HandVisual handVisual,
+            JointRecord[] jointRecords, JointRecord rootRecord)
+        {
+            rootRecord.RecordPose(time, handVisual.Root.GetPose(Space.World));
+            foreach (HandJointId jointId in IncludedJointIds())
+            {
+                Pose pose = handVisual.GetJointPose(jointId, Space.Self);
+                jointRecords[(int)jointId].RecordPose(time, pose);
+            }
+        }
+
+        private AnimationClip GenerateClipAsset(string title,
+            JointRecord rootRecord, JointRecord[] jointRecords)
+        {
+            var clip = new AnimationClip { frameRate = _framerate };
+
+            HandAnimationUtils.WriteAnimationCurves(ref clip, rootRecord, true);
+            foreach (HandJointId jointId in IncludedJointIds())
+            {
+                int index = (int)jointId;
+                HandAnimationUtils.WriteAnimationCurves(ref clip, jointRecords[index], _includeJointPosition);
+            }
+            HandAnimationUtils.Compress(ref clip, _slopeRotationThreshold, _slopePositionThreshold);
+            HandAnimationUtils.StoreAsset(clip, _folder, $"{title}.anim");
+            return clip;
+        }
+
+        private IEnumerable<HandJointId> IncludedJointIds()
+        {
+            for (HandJointId jointId = HandJointId.HandStart; jointId < HandJointId.HandEnd; jointId++)
+            {
+                int index = (int)jointId;
+                if (((int)_includedJoints & (1 << index)) == 0)
+                    continue;
+                yield return jointId;
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // Mirror
+        // ═══════════════════════════════════════════════════════════════
+
+        private void MirrorClip(AnimationClip clip)
+        {
+            HandVisual sourceVisual = clip == _leftClip ? _leftHandVisual : _rightHandVisual;
+            if (sourceVisual == null)
+            {
+                Debug.LogError("[DualHandRecorder] Need the original HandVisual to mirror.");
+                return;
+            }
+
+            if (!HandAnimationUtils.TryGetClipHandedness(clip, _handLeftPrefix, _handRightPrefix,
+                    out Handedness fromHandedness))
+            {
+                fromHandedness = sourceVisual.Root.name.ToLower().Contains("left")
+                    ? Handedness.Left : Handedness.Right;
+            }
+
+            HandFingerJointFlags jointIdMask = HandFingerJointFlags.None;
+            foreach (var id in IncludedJointIds())
+                jointIdMask |= (HandFingerJointFlags)(1 << (int)id);
+
+            AnimationClip mirrorClip = HandAnimationUtils.Mirror(clip,
+                sourceVisual.Joints, sourceVisual.Root, jointIdMask,
+                fromHandedness, _handLeftPrefix, _handRightPrefix, _includeJointPosition);
+            HandAnimationUtils.Compress(ref mirrorClip, _slopeRotationThreshold, _slopePositionThreshold);
+            HandAnimationUtils.StoreAsset(mirrorClip, _folder, $"{clip.name}_mirror.anim");
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // Ghost Preview (dual)
+        // ═══════════════════════════════════════════════════════════════
+
+        private void UpdateGhosts(float normalizedTime, bool forceUpdate)
+        {
+            UpdateSingleGhost(ref _leftGhost, _leftClip, _leftHandVisual,
+                Handedness.Left, normalizedTime, forceUpdate);
+            UpdateSingleGhost(ref _rightGhost, _rightClip, _rightHandVisual,
+                Handedness.Right, normalizedTime, forceUpdate);
+        }
+
+        private void UpdateSingleGhost(ref HandGhost ghost, AnimationClip clip,
+            HandVisual handVisual, Handedness defaultHandedness,
+            float normalizedTime, bool forceUpdate)
+        {
+            if (clip == null)
+            {
+                DestroyGhost(ref ghost);
+                return;
+            }
+
+            if (GhostProvider == null)
+                return;
+
+            if (forceUpdate || ghost == null)
+            {
+                Handedness handedness;
+                if (!HandAnimationUtils.TryGetClipHandedness(clip, _handLeftPrefix, _handRightPrefix,
+                        out handedness))
+                {
+                    handedness = defaultHandedness;
+                    if (handVisual != null && handVisual.Root != null)
+                    {
+                        handedness = handVisual.Root.name.ToLower().Contains("left")
+                            ? Handedness.Left : Handedness.Right;
+                    }
+                    if (clip.name.Contains("mirror"))
+                    {
+                        handedness = handedness == Handedness.Left
+                            ? Handedness.Right : Handedness.Left;
+                    }
+                }
+
+                if (ghost == null)
+                {
+                    HandGhost prototype = GhostProvider.GetHand(handedness);
+                    ghost = Instantiate(prototype);
+                    ghost.gameObject.hideFlags = HideFlags.HideAndDontSave;
+                }
+            }
+
+            if (ghost != null)
+            {
+                float time = normalizedTime * clip.length;
+                clip.SampleAnimation(ghost.Root.gameObject, time);
+            }
+        }
+
+        private void DestroyGhosts()
+        {
+            DestroyGhost(ref _leftGhost);
+            DestroyGhost(ref _rightGhost);
+        }
+
+        private static void DestroyGhost(ref HandGhost ghost)
+        {
+            if (ghost != null)
+            {
+                DestroyImmediate(ghost.gameObject);
+                ghost = null;
+            }
+        }
+    }
+}

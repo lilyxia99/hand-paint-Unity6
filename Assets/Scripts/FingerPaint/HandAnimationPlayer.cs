@@ -42,8 +42,6 @@ namespace FingerPaint
 
         private GameObject _handInstance;
         private Animator _animator;
-        private Vector3 _startLocalPos;
-        private Quaternion _startLocalRot;
 
         // ─── Public API ─────────────────────────────────────────────────
 
@@ -99,6 +97,11 @@ namespace FingerPaint
             // Animator ignores clip.wrapMode — it only respects the clip's
             // internal loopTime setting which can't be changed at runtime.
             // So we manually loop by crossfading back to the start.
+            //
+            // With applyRootMotion = false, the Animator applies root position
+            // curves as regular property animations (absolute values, no deltas).
+            // No manual position reset is needed — the curves handle positioning
+            // continuously, and CrossFade blends position naturally from end → start.
             if (_loop && _animator != null && _animator.runtimeAnimatorController != null)
             {
                 // Don't re-trigger if already blending back to start
@@ -108,10 +111,6 @@ namespace FingerPaint
                 var stateInfo = _animator.GetCurrentAnimatorStateInfo(0);
                 if (stateInfo.normalizedTime >= 1.0f)
                 {
-                    // Reset position so root motion doesn't accumulate across loops
-                    _handInstance.transform.localPosition = _startLocalPos;
-                    _handInstance.transform.localRotation = _startLocalRot;
-
                     if (_loopBlendDuration > 0f)
                     {
                         // Smooth blend: crossfade from end pose back to start pose
@@ -184,13 +183,16 @@ namespace FingerPaint
                 _animator = _handInstance.AddComponent<Animator>();
 
             _animator.runtimeAnimatorController = _animatorController;
-            _animator.applyRootMotion = true;
 
-            // Force evaluate frame 0 so the hand snaps to its starting pose,
-            // then cache that position for loop resets.
+            // applyRootMotion = false ensures root position/rotation curves
+            // (path "") are applied as regular property animations — absolute
+            // local-position values from the clip, NOT accumulated deltas.
+            // This preserves the world-space positions recorded during capture,
+            // so both hands maintain correct relative positioning.
+            _animator.applyRootMotion = false;
+
+            // Force evaluate frame 0 so the hand snaps to its starting pose.
             _animator.Update(0f);
-            _startLocalPos = _handInstance.transform.localPosition;
-            _startLocalRot = _handInstance.transform.localRotation;
 
             Debug.Log($"[HandAnimationPlayer] Playback ready: {_handInstance.name} with {_animatorController.name} (loop={_loop})");
         }
