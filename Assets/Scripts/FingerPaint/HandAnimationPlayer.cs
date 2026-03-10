@@ -34,6 +34,13 @@ namespace FingerPaint
         [Tooltip("Seconds to blend from end pose back to start pose when looping. 0 = hard snap.")]
         [SerializeField] [Range(0f, 2f)] private float _loopBlendDuration = 0.5f;
 
+        [Header("Voice Audio (optional)")]
+        [Tooltip("WAV clip recorded by DualHandAnimationRecorder. Assign on ONE hand player only.")]
+        [SerializeField] private AudioClip _voiceClip;
+
+        [Tooltip("Volume for voice playback.")]
+        [SerializeField] [Range(0f, 1f)] private float _voiceVolume = 1f;
+
         [Header("Material Override")]
         [Tooltip("Optional material to apply to the hand mesh. Leave null for the prefab default.")]
         [SerializeField] private Material _handMaterial;
@@ -42,6 +49,7 @@ namespace FingerPaint
 
         private GameObject _handInstance;
         private Animator _animator;
+        private AudioSource _audioSource;
 
         // ─── Public API ─────────────────────────────────────────────────
 
@@ -56,21 +64,28 @@ namespace FingerPaint
         }
 
         /// <summary>
-        /// Restart playback from the beginning.
+        /// Restart playback from the beginning (animation + voice).
         /// </summary>
         public void Restart()
         {
             if (_animator != null)
                 _animator.Play(_animator.GetCurrentAnimatorStateInfo(0).shortNameHash, 0, 0f);
+            RestartAudio();
         }
 
         /// <summary>
-        /// Pause or resume playback.
+        /// Pause or resume playback (animation + voice).
         /// </summary>
         public void SetPaused(bool paused)
         {
             if (_animator != null)
                 _animator.speed = paused ? 0f : 1f;
+
+            if (_audioSource != null && _audioSource.clip != null)
+            {
+                if (paused) _audioSource.Pause();
+                else _audioSource.UnPause();
+            }
         }
 
         // ─── Lifecycle ──────────────────────────────────────────────────
@@ -121,6 +136,9 @@ namespace FingerPaint
                         // Hard snap back to start
                         _animator.Play(stateInfo.shortNameHash, 0, 0f);
                     }
+
+                    // Restart voice audio in sync with the animation loop
+                    RestartAudio();
                 }
             }
         }
@@ -129,6 +147,18 @@ namespace FingerPaint
         {
             if (_handInstance != null)
                 Destroy(_handInstance);
+
+            if (_audioSource != null)
+                Destroy(_audioSource);
+        }
+
+        private void RestartAudio()
+        {
+            if (_audioSource != null && _audioSource.clip != null)
+            {
+                _audioSource.time = 0f;
+                _audioSource.Play();
+            }
         }
 
         // ─── Setup ─────────────────────────────────────────────────────
@@ -230,6 +260,19 @@ namespace FingerPaint
 
             // Force evaluate frame 0 so the hand snaps to its starting pose.
             _animator.Update(0f);
+
+            // ── Voice audio ──────────────────────────────────────────────────
+            if (_voiceClip != null)
+            {
+                _audioSource = gameObject.AddComponent<AudioSource>();
+                _audioSource.clip = _voiceClip;
+                _audioSource.volume = _voiceVolume;
+                _audioSource.loop = false;       // we handle loop-sync manually
+                _audioSource.playOnAwake = false;
+                _audioSource.spatialBlend = 0f;  // 2D audio (non-spatial)
+                _audioSource.Play();
+                Debug.Log($"[HandAnimationPlayer] Voice playback started: \"{_voiceClip.name}\" ({_voiceClip.length:F2}s)");
+            }
 
             Debug.Log($"[HandAnimationPlayer] Playback ready: {_handInstance.name} with {_animatorController.name} " +
                       $"(loop={_loop}, animRoot={animRoot.name})");

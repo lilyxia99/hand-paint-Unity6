@@ -52,6 +52,7 @@ namespace FingerPaint.Editor
         [SerializeField] private bool _recordVoice = false;
         [SerializeField] private string _audioFolder = "AudioRecordings";
         [SerializeField] private int _voiceSampleRate = 44100;
+        [SerializeField] private int _micDeviceIndex = 0;
 
         // ─── Ghost Preview ──────────────────────────────────────────────
         [SerializeField] private HandGhostProvider _ghostProvider;
@@ -71,6 +72,7 @@ namespace FingerPaint.Editor
         // ─── Recorded Clips ─────────────────────────────────────────────
         [SerializeField] private AnimationClip _leftClip;
         [SerializeField] private AnimationClip _rightClip;
+        [SerializeField] private AudioClip _voiceClip;
 
         // ─── Recording State ────────────────────────────────────────────
         private JointRecord[] _leftJointRecords;
@@ -90,6 +92,10 @@ namespace FingerPaint.Editor
         private float _trimMin = 0f;
         private float _trimMax = 1f;
         private bool _forceUpdateGhosts = true;
+
+        // ─── Audio Scrub State ──────────────────────────────────────────
+        private double _lastScrubEditorTime = -1;
+        private bool _isScrubbing;
 
         // ─── UI State ───────────────────────────────────────────────────
         private GUIStyle _richTextStyle;
@@ -137,6 +143,7 @@ namespace FingerPaint.Editor
                 _micRecorder = null;
             }
 
+            StopVoiceScrub();
             DestroyGhosts();
         }
 
@@ -208,6 +215,21 @@ namespace FingerPaint.Editor
             _recordVoice = EditorGUILayout.Toggle("Record Voice", _recordVoice);
             if (_recordVoice)
             {
+                // ── Microphone device selector ──────────────────────
+                string[] micDevices = Microphone.devices;
+                if (micDevices.Length == 0)
+                {
+                    EditorGUILayout.HelpBox("No microphone devices detected.", MessageType.Warning);
+                }
+                else
+                {
+                    // Clamp index to valid range (devices can be hot-plugged)
+                    if (_micDeviceIndex >= micDevices.Length)
+                        _micDeviceIndex = 0;
+
+                    _micDeviceIndex = EditorGUILayout.Popup("Microphone", _micDeviceIndex, micDevices);
+                }
+
                 _audioFolder = EditorGUILayout.TextField("Audio sub-folder", _audioFolder);
                 _voiceSampleRate = EditorGUILayout.IntField("Sample rate (Hz)", _voiceSampleRate);
                 EditorGUILayout.HelpBox(
@@ -253,16 +275,17 @@ namespace FingerPaint.Editor
 
             // ── Recorded clips ───────────────────────────────────────
             GUILayout.Space(10);
-            GUILayout.Label("<b>Recorded animations:</b>", _richTextStyle);
+            GUILayout.Label("<b>Recorded clips:</b>", _richTextStyle);
             _forceUpdateGhosts |= HandAnimationUtils.GenerateObjectField(ref _leftClip, "Left Clip");
             _forceUpdateGhosts |= HandAnimationUtils.GenerateObjectField(ref _rightClip, "Right Clip");
+            _voiceClip = (AudioClip)EditorGUILayout.ObjectField("Voice Clip", _voiceClip, typeof(AudioClip), false);
 
             // ── Preview / Trim ───────────────────────────────────────
-            bool hasAnyClip = _leftClip != null || _rightClip != null;
+            bool hasAnyClip = _leftClip != null || _rightClip != null || _voiceClip != null;
             if (hasAnyClip)
             {
                 GUILayout.Space(5);
-                GUILayout.Label("Preview and Trim (both clips together):");
+                GUILayout.Label("Preview and Trim (all clips together):");
                 GUILayout.BeginHorizontal();
 
                 float prevMin = _trimMin;
@@ -270,12 +293,14 @@ namespace FingerPaint.Editor
                 EditorGUILayout.MinMaxSlider(ref _trimMin, ref _trimMax, 0f, 1f);
                 _showMin = (prevMin != _trimMin) || (_showMin && prevMax == _trimMax);
 
-                if (GUILayout.Button("Trim Both", GUILayout.Height(20)))
+                if (GUILayout.Button("Trim All", GUILayout.Height(20)))
                 {
                     if (_leftClip != null)
                         HandAnimationUtils.Trim(ref _leftClip, _trimMin, _trimMax);
                     if (_rightClip != null)
                         HandAnimationUtils.Trim(ref _rightClip, _trimMin, _trimMax);
+                    if (_voiceClip != null)
+                        TrimVoiceClip(_trimMin, _trimMax);
                     _trimMin = 0f;
                     _trimMax = 1f;
                 }
@@ -290,12 +315,16 @@ namespace FingerPaint.Editor
                     MirrorClip(_rightClip);
                 GUILayout.EndHorizontal();
 
-                // ── Update ghosts ────────────────────────────────────
+                // ── Update ghosts + audio scrub ──────────────────────
                 float time = _showMin ? _trimMin : _trimMax;
                 UpdateGhosts(time, _forceUpdateGhosts);
+
+                bool sliderChanged = (prevMin != _trimMin) || (prevMax != _trimMax);
+                ScrubVoicePreview(time, sliderChanged);
             }
             else
             {
+                StopVoiceScrub();
                 DestroyGhosts();
             }
 
@@ -335,7 +364,14 @@ namespace FingerPaint.Editor
             if (_recordVoice)
             {
                 _micRecorder = new EditorMicRecorder(_voiceSampleRate);
-                if (_micRecorder.StartCapture())
+
+                // Resolve selected device name (null → first available)
+                string selectedDevice = null;
+                string[] micDevices = Microphone.devices;
+                if (micDevices.Length > 0 && _micDeviceIndex < micDevices.Length)
+                    selectedDevice = micDevices[_micDeviceIndex];
+
+                if (_micRecorder.StartCapture(selectedDevice))
                 {
                     EditorApplication.update += DrainMicSamples;
                     Debug.Log($"[DualHandRecorder] Voice recording started @ {_micRecorder.EffectiveSampleRate} Hz");
@@ -390,7 +426,10 @@ namespace FingerPaint.Editor
 
                     string wavPath = Path.Combine(targetFolder, $"{_clipBaseName}_Voice.wav");
                     WavFileWriter.Write(wavPath, samples, sampleRate);
-                    AssetDatabase.Refresh();
+                    AssetDatabase.ImportAsset(wavPath);
+
+                    // Auto-assign the voice clip reference
+                    _voiceClip = AssetDatabase.LoadAssetAtPath<AudioClip>(wavPath);
 
                     float duration = (float)samples.Count / sampleRate;
                     Debug.Log($"[DualHandRecorder] Voice saved: {wavPath} ({duration:F2}s, {sampleRate}Hz)");
@@ -510,6 +549,118 @@ namespace FingerPaint.Editor
                 fromHandedness, _handLeftPrefix, _handRightPrefix, _includeJointPosition);
             HandAnimationUtils.Compress(ref mirrorClip, _slopeRotationThreshold, _slopePositionThreshold);
             HandAnimationUtils.StoreAsset(mirrorClip, _folder, $"{clip.name}_mirror.anim");
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // Voice Trim
+        // ═══════════════════════════════════════════════════════════════
+
+        /// <summary>
+        /// Trim the voice AudioClip to the normalized [trimMin, trimMax] range.
+        /// Overwrites the existing WAV file on disk and reloads it.
+        /// </summary>
+        private void TrimVoiceClip(float trimMin, float trimMax)
+        {
+            if (_voiceClip == null) return;
+
+            string assetPath = AssetDatabase.GetAssetPath(_voiceClip);
+            if (string.IsNullOrEmpty(assetPath))
+            {
+                Debug.LogWarning("[DualHandRecorder] Voice clip has no asset path — cannot trim.");
+                return;
+            }
+
+            int channels = _voiceClip.channels;
+            int sampleRate = _voiceClip.frequency;
+            int totalSamplesPerChannel = _voiceClip.samples;
+
+            // Read all interleaved samples from the AudioClip
+            float[] allSamples = new float[totalSamplesPerChannel * channels];
+            _voiceClip.GetData(allSamples, 0);
+
+            // Calculate trim range (per-channel boundaries, then scale to interleaved)
+            int startFrame = Mathf.Clamp((int)(trimMin * totalSamplesPerChannel), 0, totalSamplesPerChannel);
+            int endFrame = Mathf.Clamp((int)(trimMax * totalSamplesPerChannel), startFrame, totalSamplesPerChannel);
+            int startIdx = startFrame * channels;
+            int endIdx = endFrame * channels;
+            int trimmedCount = endIdx - startIdx;
+
+            if (trimmedCount <= 0)
+            {
+                Debug.LogWarning("[DualHandRecorder] Trim range is empty — voice clip not modified.");
+                return;
+            }
+
+            // Extract trimmed samples
+            var trimmedSamples = new List<float>(trimmedCount);
+            for (int i = startIdx; i < endIdx; i++)
+                trimmedSamples.Add(allSamples[i]);
+
+            // Overwrite the WAV file
+            WavFileWriter.Write(assetPath, trimmedSamples, sampleRate, channels);
+            AssetDatabase.ImportAsset(assetPath);
+
+            // Reload
+            _voiceClip = AssetDatabase.LoadAssetAtPath<AudioClip>(assetPath);
+
+            float duration = (float)(endFrame - startFrame) / sampleRate;
+            Debug.Log($"[DualHandRecorder] Voice trimmed: {duration:F2}s ({assetPath})");
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // Audio Scrub (editor preview while dragging trim slider)
+        // ═══════════════════════════════════════════════════════════════
+
+        /// <summary>
+        /// Play a short preview of the voice clip at the given normalised position
+        /// while the trim slider is being dragged. Automatically stops ~0.3s after
+        /// the slider stops moving.
+        /// </summary>
+        private void ScrubVoicePreview(float normalizedTime, bool sliderChanged)
+        {
+            if (_voiceClip == null)
+            {
+                if (_isScrubbing) StopVoiceScrub();
+                return;
+            }
+
+            if (sliderChanged)
+            {
+                // Start or restart playback from the scrub position
+                int samplePos = Mathf.Clamp(
+                    (int)(normalizedTime * _voiceClip.samples),
+                    0, _voiceClip.samples - 1);
+
+                AudioUtil.StopAllPreviewClips();
+                AudioUtil.PlayPreviewClip(_voiceClip, samplePos, false);
+
+                _isScrubbing = true;
+                _lastScrubEditorTime = EditorApplication.timeSinceStartup;
+                Repaint(); // keep OnGUI firing so we can detect the stop
+            }
+            else if (_isScrubbing)
+            {
+                // Slider stopped moving — let audio ring for a moment, then stop
+                double elapsed = EditorApplication.timeSinceStartup - _lastScrubEditorTime;
+                if (elapsed > 0.3)
+                {
+                    StopVoiceScrub();
+                }
+                else
+                {
+                    Repaint(); // keep ticking until we reach the timeout
+                }
+            }
+        }
+
+        private void StopVoiceScrub()
+        {
+            if (_isScrubbing)
+            {
+                AudioUtil.StopAllPreviewClips();
+                _isScrubbing = false;
+                _lastScrubEditorTime = -1;
+            }
         }
 
         // ═══════════════════════════════════════════════════════════════

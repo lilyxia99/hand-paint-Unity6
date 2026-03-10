@@ -57,7 +57,11 @@ namespace FingerPaint.Editor
         /// Start microphone capture. Must be called during Play mode.
         /// Returns false if no microphone device is available.
         /// </summary>
-        public bool StartCapture()
+        /// <param name="deviceName">
+        /// Name of the microphone device to use (from Microphone.devices).
+        /// Pass null or empty string to use the first available device.
+        /// </param>
+        public bool StartCapture(string deviceName = null)
         {
             if (IsCapturing) return true;
 
@@ -67,8 +71,29 @@ namespace FingerPaint.Editor
                 return false;
             }
 
-            // Use default device
-            _micDeviceName = Microphone.devices[0];
+            // Use specified device or fall back to first available
+            if (string.IsNullOrEmpty(deviceName))
+            {
+                _micDeviceName = Microphone.devices[0];
+            }
+            else
+            {
+                // Validate the device name exists
+                bool found = false;
+                foreach (var dev in Microphone.devices)
+                {
+                    if (dev == deviceName) { found = true; break; }
+                }
+                if (!found)
+                {
+                    Debug.LogWarning($"[EditorMicRecorder] Device \"{deviceName}\" not found. Falling back to \"{Microphone.devices[0]}\".");
+                    _micDeviceName = Microphone.devices[0];
+                }
+                else
+                {
+                    _micDeviceName = deviceName;
+                }
+            }
 
             // Query device capabilities
             Microphone.GetDeviceCaps(_micDeviceName, out int minFreq, out int maxFreq);
