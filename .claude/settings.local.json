@@ -9,7 +9,8 @@
       "Bash(powershell -Command:*)",
       "Bash(xargs grep -l \"VoiceFeatures\\\\|BrushState\")",
       "Bash(done)",
-      "Bash(ls -la 'C:\\\\Users\\\\l_xia\\\\Documents\\\\DEVELOPER\\\\hand-paint\\\\My project\\\\Assets\\\\Scripts\\\\FingerPaint\\\\HandAnimation'*)"
+      "Bash(ls -la 'C:\\\\Users\\\\l_xia\\\\Documents\\\\DEVELOPER\\\\hand-paint\\\\My project\\\\Assets\\\\Scripts\\\\FingerPaint\\\\HandAnimation'*)",
+      "Bash(xargs grep -l \"Microphone\\\\|AudioClip\\\\|AudioSource\\\\|recording\\\\|mic\")"
     ]
   }
 }

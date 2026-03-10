@@ -14,6 +14,7 @@ using Oculus.Interaction.HandGrab.Visuals;
 using Oculus.Interaction.Input;
 using Oculus.Interaction.Utils;
 using System.Collections.Generic;
+using System.IO;
 using UnityEditor;
 using UnityEngine;
 
@@ -47,6 +48,11 @@ namespace FingerPaint.Editor
         [SerializeField] private string _clipBaseName = "HandAnimation";
         [SerializeField] private KeyCode _recordKey = KeyCode.Space;
 
+        // ─── Voice Recording Settings ──────────────────────────────────
+        [SerializeField] private bool _recordVoice = false;
+        [SerializeField] private string _audioFolder = "AudioRecordings";
+        [SerializeField] private int _voiceSampleRate = 44100;
+
         // ─── Ghost Preview ──────────────────────────────────────────────
         [SerializeField] private HandGhostProvider _ghostProvider;
 #if ISDK_OPENXR_HAND
@@ -73,6 +79,9 @@ namespace FingerPaint.Editor
         private JointRecord _rightRootRecord;
         private float _startTime;
         private bool _isRecording;
+
+        // ─── Voice Recording State ─────────────────────────────────────
+        private EditorMicRecorder _micRecorder;
 
         // ─── Preview State ──────────────────────────────────────────────
         private HandGhost _leftGhost;
@@ -119,6 +128,14 @@ namespace FingerPaint.Editor
         {
             if (_isRecording)
                 StopRecording();
+
+            // Safety: clean up mic if StopRecording didn't already
+            if (_micRecorder != null)
+            {
+                EditorApplication.update -= DrainMicSamples;
+                _micRecorder.Dispose();
+                _micRecorder = null;
+            }
 
             DestroyGhosts();
         }
@@ -181,7 +198,21 @@ namespace FingerPaint.Editor
                 string preview = "";
                 if (hasLeft) preview += $"  Left:  {_clipBaseName}_Left.anim\n";
                 if (hasRight) preview += $"  Right: {_clipBaseName}_Right.anim";
+                if (_recordVoice) preview += $"\n  Voice: {_clipBaseName}_Voice.wav";
                 EditorGUILayout.HelpBox($"Will generate:\n{preview}", MessageType.Info);
+            }
+
+            // ── Voice recording settings ─────────────────────────────
+            GUILayout.Space(10);
+            GUILayout.Label("<b>Voice Recording</b>", _richTextStyle);
+            _recordVoice = EditorGUILayout.Toggle("Record Voice", _recordVoice);
+            if (_recordVoice)
+            {
+                _audioFolder = EditorGUILayout.TextField("Audio sub-folder", _audioFolder);
+                _voiceSampleRate = EditorGUILayout.IntField("Sample rate (Hz)", _voiceSampleRate);
+                EditorGUILayout.HelpBox(
+                    $"Voice will be saved to:\n  Assets/{_audioFolder}/{_clipBaseName}_Voice.wav",
+                    MessageType.Info);
             }
 
             // ── Record button ────────────────────────────────────────
@@ -300,8 +331,26 @@ namespace FingerPaint.Editor
                 _rightHandVisual.WhenHandVisualUpdated += HandleRightHandUpdated;
             }
 
+            // ── Voice recording ───────────────────────────────────────
+            if (_recordVoice)
+            {
+                _micRecorder = new EditorMicRecorder(_voiceSampleRate);
+                if (_micRecorder.StartCapture())
+                {
+                    EditorApplication.update += DrainMicSamples;
+                    Debug.Log($"[DualHandRecorder] Voice recording started @ {_micRecorder.EffectiveSampleRate} Hz");
+                }
+                else
+                {
+                    Debug.LogWarning("[DualHandRecorder] Failed to start microphone. Voice will NOT be recorded.");
+                    _micRecorder.Dispose();
+                    _micRecorder = null;
+                }
+            }
+
             int count = (_leftHandVisual != null ? 1 : 0) + (_rightHandVisual != null ? 1 : 0);
-            Debug.Log($"[DualHandRecorder] *** RECORDING {count} HAND(S) *** Move your hands!");
+            string voiceStr = _micRecorder != null ? " + VOICE" : "";
+            Debug.Log($"[DualHandRecorder] *** RECORDING {count} HAND(S){voiceStr} *** Move your hands!");
         }
 
         private void StopRecording()
@@ -323,8 +372,45 @@ namespace FingerPaint.Editor
                 Debug.Log($"[DualHandRecorder] Right clip saved: {_rightClip.length:F2}s, {_rightClip.frameRate}fps");
             }
 
+            // ── Save voice recording ─────────────────────────────────
+            if (_micRecorder != null)
+            {
+                EditorApplication.update -= DrainMicSamples;
+
+                var samples = _micRecorder.StopCaptureAndGetSamples();
+                int sampleRate = _micRecorder.EffectiveSampleRate;
+                _micRecorder.Dispose();
+                _micRecorder = null;
+
+                if (samples.Count > 0)
+                {
+                    string targetFolder = Path.Combine("Assets", _audioFolder);
+                    if (!Directory.Exists(targetFolder))
+                        Directory.CreateDirectory(targetFolder);
+
+                    string wavPath = Path.Combine(targetFolder, $"{_clipBaseName}_Voice.wav");
+                    WavFileWriter.Write(wavPath, samples, sampleRate);
+                    AssetDatabase.Refresh();
+
+                    float duration = (float)samples.Count / sampleRate;
+                    Debug.Log($"[DualHandRecorder] Voice saved: {wavPath} ({duration:F2}s, {sampleRate}Hz)");
+                }
+                else
+                {
+                    Debug.LogWarning("[DualHandRecorder] No audio samples captured.");
+                }
+            }
+
             Debug.Log("[DualHandRecorder] *** RECORDING STOPPED ***");
             _forceUpdateGhosts = true;
+        }
+
+        // ─── Microphone drain callback ───────────────────────────────
+
+        private void DrainMicSamples()
+        {
+            if (_micRecorder != null && _micRecorder.IsCapturing)
+                _micRecorder.DrainSamples();
         }
 
         // ─── Per-hand update callbacks ───────────────────────────────
