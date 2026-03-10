@@ -1172,6 +1172,8 @@ MonoBehaviour:
   _animatorController: {fileID: 9100000, guid: dd4c856ce6f51c64aab0d53d3f5e9e3f, type: 2}
   _loop: 1
   _loopBlendDuration: 0.5
+  _voiceClip: {fileID: 8300000, guid: 411e3b2b8ca8e7f4a914084fafc5be75, type: 3}
+  _voiceVolume: 1
   _handMaterial: {fileID: 2100000, guid: d0e81afd49d98447aaeb49b1bb2c0599, type: 2}
 --- !u!4 &1003847491
 Transform:
@@ -2313,6 +2315,8 @@ MonoBehaviour:
   _animatorController: {fileID: 9100000, guid: cf37ebc93028944498fc6a23e24012ac, type: 2}
   _loop: 1
   _loopBlendDuration: 0.5
+  _voiceClip: {fileID: 0}
+  _voiceVolume: 1
   _handMaterial: {fileID: 2100000, guid: d0e81afd49d98447aaeb49b1bb2c0599, type: 2}
 --- !u!4 &1991463408
 Transform:

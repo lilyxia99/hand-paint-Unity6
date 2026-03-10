@@ -15,11 +15,38 @@ using Oculus.Interaction.Input;
 using Oculus.Interaction.Utils;
 using System.Collections.Generic;
 using System.IO;
+using System.Reflection;
 using UnityEditor;
 using UnityEngine;
 
 namespace FingerPaint.Editor
 {
+    /// <summary>
+    /// Reflection wrapper for UnityEditor.AudioUtil (internal class).
+    /// </summary>
+    internal static class AudioUtilReflection
+    {
+        private static readonly System.Type _type =
+            typeof(UnityEditor.Editor).Assembly.GetType("UnityEditor.AudioUtil");
+
+        public static void StopAllPreviewClips()
+        {
+            var method = _type?.GetMethod("StopAllPreviewClips",
+                BindingFlags.Static | BindingFlags.Public);
+            method?.Invoke(null, null);
+        }
+
+        public static void PlayPreviewClip(AudioClip clip, int startSample = 0, bool loop = false)
+        {
+            var method = _type?.GetMethod("PlayPreviewClip",
+                BindingFlags.Static | BindingFlags.Public,
+                null,
+                new System.Type[] { typeof(AudioClip), typeof(int), typeof(bool) },
+                null);
+            method?.Invoke(null, new object[] { clip, startSample, loop });
+        }
+    }
+
     public class DualHandAnimationRecorder : EditorWindow
     {
         // ─── Hand Visual References ─────────────────────────────────────
@@ -631,8 +658,8 @@ namespace FingerPaint.Editor
                     (int)(normalizedTime * _voiceClip.samples),
                     0, _voiceClip.samples - 1);
 
-                AudioUtil.StopAllPreviewClips();
-                AudioUtil.PlayPreviewClip(_voiceClip, samplePos, false);
+                AudioUtilReflection.StopAllPreviewClips();
+                AudioUtilReflection.PlayPreviewClip(_voiceClip, samplePos, false);
 
                 _isScrubbing = true;
                 _lastScrubEditorTime = EditorApplication.timeSinceStartup;
@@ -657,7 +684,7 @@ namespace FingerPaint.Editor
         {
             if (_isScrubbing)
             {
-                AudioUtil.StopAllPreviewClips();
+                AudioUtilReflection.StopAllPreviewClips();
                 _isScrubbing = false;
                 _lastScrubEditorTime = -1;
             }
