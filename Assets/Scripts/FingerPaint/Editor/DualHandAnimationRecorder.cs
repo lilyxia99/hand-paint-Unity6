@@ -120,6 +120,14 @@ namespace FingerPaint.Editor
         private float _trimMax = 1f;
         private bool _forceUpdateGhosts = true;
 
+        // ─── Playback State ─────────────────────────────────────────────
+        private bool _isPlaying;
+        private float _playbackNormalizedTime = 0f;
+        private double _lastPlaybackEditorTime = -1;
+        private float _playbackSpeed = 1f;
+        private static readonly float[] _speedOptions = { 0.25f, 0.5f, 1f, 2f, 4f };
+        private static readonly string[] _speedLabels = { "0.25×", "0.5×", "1×", "2×", "4×" };
+
         // ─── Audio Scrub State ──────────────────────────────────────────
         private double _lastScrubEditorTime = -1;
         private bool _isScrubbing;
@@ -161,6 +169,8 @@ namespace FingerPaint.Editor
         {
             if (_isRecording)
                 StopRecording();
+
+            StopPlayback();
 
             // Safety: clean up mic if StopRecording didn't already
             if (_micRecorder != null)
@@ -311,8 +321,122 @@ namespace FingerPaint.Editor
             bool hasAnyClip = _leftClip != null || _rightClip != null || _voiceClip != null;
             if (hasAnyClip)
             {
-                GUILayout.Space(5);
-                GUILayout.Label("Preview and Trim (all clips together):");
+                float clipLength = 0f;
+                if (_leftClip != null) clipLength = Mathf.Max(clipLength, _leftClip.length);
+                if (_rightClip != null) clipLength = Mathf.Max(clipLength, _rightClip.length);
+                if (_voiceClip != null) clipLength = Mathf.Max(clipLength, _voiceClip.length);
+
+                // ── Playback controls ────────────────────────────────
+                GUILayout.Space(10);
+                GUILayout.Label("<b>Playback Preview</b>", _richTextStyle);
+
+                // Time display
+                float currentSeconds = _playbackNormalizedTime * clipLength;
+                int curMin = (int)(currentSeconds / 60f);
+                float curSec = currentSeconds - curMin * 60f;
+                int totMin = (int)(clipLength / 60f);
+                float totSec = clipLength - totMin * 60f;
+                EditorGUILayout.LabelField(
+                    $"  {curMin:D2}:{curSec:05.2f}  /  {totMin:D2}:{totSec:05.2f}",
+                    EditorStyles.boldLabel);
+
+                // Playback slider
+                float prevPlayback = _playbackNormalizedTime;
+                _playbackNormalizedTime = EditorGUILayout.Slider(_playbackNormalizedTime, 0f, 1f);
+                bool playbackSliderChanged = !Mathf.Approximately(prevPlayback, _playbackNormalizedTime);
+                if (playbackSliderChanged && _isPlaying)
+                {
+                    // User dragged slider while playing — update the time base
+                    _lastPlaybackEditorTime = EditorApplication.timeSinceStartup;
+                }
+
+                // Play/Pause + Speed
+                GUILayout.BeginHorizontal();
+
+                GUI.backgroundColor = _isPlaying ? new Color(1f, 0.85f, 0.4f) : new Color(0.4f, 1f, 0.5f);
+                string playLabel = _isPlaying ? "||  Pause" : ">  Play";
+                if (GUILayout.Button(playLabel, GUILayout.Height(30), GUILayout.Width(100)))
+                {
+                    if (_isPlaying)
+                        StopPlayback();
+                    else
+                        StartPlayback();
+                    Repaint();
+                }
+                GUI.backgroundColor = Color.white;
+
+                if (GUILayout.Button("|<", GUILayout.Height(30), GUILayout.Width(35)))
+                {
+                    _playbackNormalizedTime = 0f;
+                    _lastPlaybackEditorTime = EditorApplication.timeSinceStartup;
+                    playbackSliderChanged = true;
+                }
+
+                // Speed selector
+                GUILayout.Label("Speed:", GUILayout.Width(42));
+                int currentSpeedIdx = System.Array.IndexOf(_speedOptions, _playbackSpeed);
+                if (currentSpeedIdx < 0) currentSpeedIdx = 2; // default 1x
+                int newSpeedIdx = EditorGUILayout.Popup(currentSpeedIdx, _speedLabels, GUILayout.Width(55));
+                _playbackSpeed = _speedOptions[newSpeedIdx];
+
+                GUILayout.EndHorizontal();
+
+                // Frame stepping
+                GUILayout.BeginHorizontal();
+                float frameStep1 = (clipLength > 0f) ? (1f / (_framerate * clipLength)) : 0f;
+                float frameStep5 = frameStep1 * 5f;
+
+                if (GUILayout.Button("<< 5f", GUILayout.Height(24)))
+                {
+                    _playbackNormalizedTime = Mathf.Max(0f, _playbackNormalizedTime - frameStep5);
+                    playbackSliderChanged = true;
+                }
+                if (GUILayout.Button("< 1f", GUILayout.Height(24)))
+                {
+                    _playbackNormalizedTime = Mathf.Max(0f, _playbackNormalizedTime - frameStep1);
+                    playbackSliderChanged = true;
+                }
+                if (GUILayout.Button("1f >", GUILayout.Height(24)))
+                {
+                    _playbackNormalizedTime = Mathf.Min(1f, _playbackNormalizedTime + frameStep1);
+                    playbackSliderChanged = true;
+                }
+                if (GUILayout.Button("5f >>", GUILayout.Height(24)))
+                {
+                    _playbackNormalizedTime = Mathf.Min(1f, _playbackNormalizedTime + frameStep5);
+                    playbackSliderChanged = true;
+                }
+
+                // Prev/Next keyframe
+                if (GUILayout.Button("< Key", GUILayout.Height(24)))
+                {
+                    float t = FindAdjacentKeyframeTime(clipLength, -1);
+                    if (t >= 0f) { _playbackNormalizedTime = t / clipLength; playbackSliderChanged = true; }
+                }
+                if (GUILayout.Button("Key >", GUILayout.Height(24)))
+                {
+                    float t = FindAdjacentKeyframeTime(clipLength, 1);
+                    if (t >= 0f) { _playbackNormalizedTime = t / clipLength; playbackSliderChanged = true; }
+                }
+                GUILayout.EndHorizontal();
+
+                // Set Trim Start / End buttons
+                GUILayout.BeginHorizontal();
+                if (GUILayout.Button($"Set Trim Start ({curMin:D2}:{curSec:04.1f})", GUILayout.Height(24)))
+                {
+                    _trimMin = _playbackNormalizedTime;
+                    if (_trimMin > _trimMax) _trimMax = _trimMin;
+                }
+                if (GUILayout.Button($"Set Trim End ({curMin:D2}:{curSec:04.1f})", GUILayout.Height(24)))
+                {
+                    _trimMax = _playbackNormalizedTime;
+                    if (_trimMax < _trimMin) _trimMin = _trimMax;
+                }
+                GUILayout.EndHorizontal();
+
+                // ── Trim controls ────────────────────────────────────
+                GUILayout.Space(10);
+                GUILayout.Label("<b>Trim Range</b>", _richTextStyle);
                 GUILayout.BeginHorizontal();
 
                 float prevMin = _trimMin;
@@ -322,6 +446,7 @@ namespace FingerPaint.Editor
 
                 if (GUILayout.Button("Trim All", GUILayout.Height(20)))
                 {
+                    StopPlayback();
                     if (_leftClip != null)
                         HandAnimationUtils.Trim(ref _leftClip, _trimMin, _trimMax);
                     if (_rightClip != null)
@@ -330,8 +455,16 @@ namespace FingerPaint.Editor
                         TrimVoiceClip(_trimMin, _trimMax);
                     _trimMin = 0f;
                     _trimMax = 1f;
+                    _playbackNormalizedTime = 0f;
                 }
                 GUILayout.EndHorizontal();
+
+                // Trim range time display
+                float trimStartSec = _trimMin * clipLength;
+                float trimEndSec = _trimMax * clipLength;
+                EditorGUILayout.LabelField(
+                    $"  Start: {(int)(trimStartSec/60):D2}:{(trimStartSec%60):04.1f}  —  End: {(int)(trimEndSec/60):D2}:{(trimEndSec%60):04.1f}  ({(trimEndSec - trimStartSec):F1}s)",
+                    EditorStyles.miniLabel);
 
                 // ── Mirror buttons ───────────────────────────────────
                 GUILayout.Space(5);
@@ -342,15 +475,48 @@ namespace FingerPaint.Editor
                     MirrorClip(_rightClip);
                 GUILayout.EndHorizontal();
 
-                // ── Update ghosts + audio scrub ──────────────────────
-                float time = _showMin ? _trimMin : _trimMax;
-                UpdateGhosts(time, _forceUpdateGhosts);
+                // ── Advance playback ─────────────────────────────────
+                if (_isPlaying)
+                {
+                    double now = EditorApplication.timeSinceStartup;
+                    if (_lastPlaybackEditorTime > 0)
+                    {
+                        double delta = now - _lastPlaybackEditorTime;
+                        float normalizedDelta = (float)(delta * _playbackSpeed) / clipLength;
+                        _playbackNormalizedTime += normalizedDelta;
 
-                bool sliderChanged = (prevMin != _trimMin) || (prevMax != _trimMax);
-                ScrubVoicePreview(time, sliderChanged);
+                        if (_playbackNormalizedTime >= 1f)
+                        {
+                            _playbackNormalizedTime = 1f;
+                            StopPlayback();
+                        }
+                    }
+                    _lastPlaybackEditorTime = now;
+                    Repaint();
+                }
+
+                // ── Update ghosts + audio scrub ──────────────────────
+                float ghostTime;
+                bool voiceScrubChanged;
+                bool trimSliderChanged = (prevMin != _trimMin) || (prevMax != _trimMax);
+                if (trimSliderChanged)
+                {
+                    // User is dragging the trim slider — show trim position
+                    ghostTime = _showMin ? _trimMin : _trimMax;
+                    voiceScrubChanged = true;
+                }
+                else
+                {
+                    // Use playback position (whether playing, paused, or scrubbing)
+                    ghostTime = _playbackNormalizedTime;
+                    voiceScrubChanged = playbackSliderChanged && !_isPlaying;
+                }
+                UpdateGhosts(ghostTime, _forceUpdateGhosts || _isPlaying || playbackSliderChanged || trimSliderChanged);
+                ScrubVoicePreview(ghostTime, voiceScrubChanged);
             }
             else
             {
+                StopPlayback();
                 StopVoiceScrub();
                 DestroyGhosts();
             }
@@ -688,6 +854,64 @@ namespace FingerPaint.Editor
                 _isScrubbing = false;
                 _lastScrubEditorTime = -1;
             }
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // Playback Control
+        // ═══════════════════════════════════════════════════════════════
+
+        private void StartPlayback()
+        {
+            _isPlaying = true;
+            _lastPlaybackEditorTime = EditorApplication.timeSinceStartup;
+            if (_playbackNormalizedTime >= 1f)
+                _playbackNormalizedTime = 0f;
+        }
+
+        private void StopPlayback()
+        {
+            _isPlaying = false;
+            _lastPlaybackEditorTime = -1;
+        }
+
+        /// <summary>
+        /// Find the nearest keyframe time before (direction = -1) or after (direction = +1)
+        /// the current playback position. Scans all curve bindings on both clips.
+        /// Returns the keyframe time in seconds, or -1 if none found.
+        /// </summary>
+        private float FindAdjacentKeyframeTime(float clipLength, int direction)
+        {
+            float currentTime = _playbackNormalizedTime * clipLength;
+            float bestTime = -1f;
+            float epsilon = 0.001f; // small tolerance to avoid returning the same keyframe
+
+            AnimationClip[] clips = new AnimationClip[] { _leftClip, _rightClip };
+            foreach (var clip in clips)
+            {
+                if (clip == null) continue;
+                var bindings = AnimationUtility.GetCurveBindings(clip);
+                // Only scan a subset of bindings to keep it fast on large clips
+                int step = Mathf.Max(1, bindings.Length / 20);
+                for (int b = 0; b < bindings.Length; b += step)
+                {
+                    AnimationCurve curve = AnimationUtility.GetEditorCurve(clip, bindings[b]);
+                    if (curve == null) continue;
+                    Keyframe[] keys = curve.keys;
+                    for (int k = 0; k < keys.Length; k++)
+                    {
+                        float kt = keys[k].time;
+                        if (direction > 0 && kt > currentTime + epsilon)
+                        {
+                            if (bestTime < 0f || kt < bestTime) bestTime = kt;
+                        }
+                        else if (direction < 0 && kt < currentTime - epsilon)
+                        {
+                            if (bestTime < 0f || kt > bestTime) bestTime = kt;
+                        }
+                    }
+                }
+            }
+            return bestTime;
         }
 
         // ═══════════════════════════════════════════════════════════════
