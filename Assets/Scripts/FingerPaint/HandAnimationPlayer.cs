@@ -272,6 +272,14 @@ namespace FingerPaint
                 _audioSource.playOnAwake = false;
                 _audioSource.spatialBlend = 0f;  // 2D audio (non-spatial)
 
+                // Bypass Meta XR Audio spatial processing which attenuates volume
+                _audioSource.bypassEffects = true;
+                _audioSource.bypassListenerEffects = true;
+                _audioSource.bypassReverbZones = true;
+
+                // Remove MetaXRAudioSource if Meta's plugin auto-added it
+                DisableComponentByName(gameObject, "MetaXRAudioSource");
+
                 // Small delay (~1 frame at 72fps) to let Animator start ticking
                 _audioSource.PlayDelayed(0.04f);
 
