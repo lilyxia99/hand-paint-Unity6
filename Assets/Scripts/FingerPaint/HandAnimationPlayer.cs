@@ -109,6 +109,7 @@ namespace FingerPaint
 
         private void Update()
         {
+
             // Animator ignores clip.wrapMode — it only respects the clip's
             // internal loopTime setting which can't be changed at runtime.
             // So we manually loop by crossfading back to the start.
@@ -270,7 +271,10 @@ namespace FingerPaint
                 _audioSource.loop = false;       // we handle loop-sync manually
                 _audioSource.playOnAwake = false;
                 _audioSource.spatialBlend = 0f;  // 2D audio (non-spatial)
-                _audioSource.Play();
+
+                // Small delay (~1 frame at 72fps) to let Animator start ticking
+                _audioSource.PlayDelayed(0.04f);
+
                 Debug.Log($"[HandAnimationPlayer] Voice playback started: \"{_voiceClip.name}\" ({_voiceClip.length:F2}s)");
             }
 
