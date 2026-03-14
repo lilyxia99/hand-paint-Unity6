@@ -50,6 +50,7 @@ namespace FingerPaint
         private GameObject _handInstance;
         private Animator _animator;
         private AudioSource _audioSource;
+        private bool _audioStartPending;
 
         // ─── Public API ─────────────────────────────────────────────────
 
@@ -109,6 +110,14 @@ namespace FingerPaint
 
         private void Update()
         {
+            // Start voice audio on the first frame the Animator is actively ticking,
+            // so they are perfectly synced (avoids scene-load delay mismatch).
+            if (_audioStartPending && _audioSource != null && _animator != null)
+            {
+                _audioSource.Play();
+                _audioStartPending = false;
+                Debug.Log("[HandAnimationPlayer] Voice playback started (synced with first Update)");
+            }
 
             // Animator ignores clip.wrapMode — it only respects the clip's
             // internal loopTime setting which can't be changed at runtime.
@@ -280,10 +289,11 @@ namespace FingerPaint
                 // Remove MetaXRAudioSource if Meta's plugin auto-added it
                 DisableComponentByName(gameObject, "MetaXRAudioSource");
 
-                // Small delay (~1 frame at 72fps) to let Animator start ticking
-                _audioSource.PlayDelayed(0.04f);
+                // Don't play yet — wait for first Update() so audio starts
+                // on the same frame the Animator begins ticking.
+                _audioStartPending = true;
 
-                Debug.Log($"[HandAnimationPlayer] Voice playback started: \"{_voiceClip.name}\" ({_voiceClip.length:F2}s)");
+                Debug.Log($"[HandAnimationPlayer] Voice clip ready: \"{_voiceClip.name}\" ({_voiceClip.length:F2}s) — will start on first Update");
             }
 
             Debug.Log($"[HandAnimationPlayer] Playback ready: {_handInstance.name} with {_animatorController.name} " +
