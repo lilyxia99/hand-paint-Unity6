@@ -41,6 +41,12 @@ namespace FingerPaint
         [Tooltip("Volume for voice playback.")]
         [SerializeField] [Range(0f, 1f)] private float _voiceVolume = 1f;
 
+        [Tooltip("Seconds to wait before starting playback. Gives Quest headset time to finish loading the scene.")]
+        [SerializeField] [Range(0f, 10f)] private float _startDelay = 2f;
+
+        [Tooltip("Shift audio relative to animation (seconds). Positive = audio plays later, negative = earlier. Adjustable at runtime in Inspector.")]
+        [SerializeField] [Range(-2f, 2f)] private float _audioOffset = 0f;
+
         [Header("Material Override")]
         [Tooltip("Optional material to apply to the hand mesh. Leave null for the prefab default.")]
         [SerializeField] private Material _handMaterial;
@@ -50,7 +56,8 @@ namespace FingerPaint
         private GameObject _handInstance;
         private Animator _animator;
         private AudioSource _audioSource;
-        private bool _audioStartPending;
+        private bool _playbackStartPending;
+        private float _pendingStartTime;
 
         // ─── Public API ─────────────────────────────────────────────────
 
@@ -110,26 +117,64 @@ namespace FingerPaint
 
         private void Update()
         {
-            // Start voice audio on the first frame the Animator is actively ticking,
-            // so they are perfectly synced (avoids scene-load delay mismatch).
-            if (_audioStartPending && _audioSource != null && _animator != null)
+            if (_animator == null) return;
+
+            // ── Start delay: wait for Quest headset to finish loading ─────
+            if (_playbackStartPending)
             {
-                _audioSource.Play();
-                _audioStartPending = false;
-                Debug.Log("[HandAnimationPlayer] Voice playback started (synced with first Update)");
+                if (Time.time - _pendingStartTime < _startDelay)
+                    return; // still waiting
+
+                // Start both animation and audio at the same moment
+                _animator.speed = 1f;
+
+                if (_audioSource != null)
+                {
+                    if (_audioOffset > 0f)
+                    {
+                        // Audio should lag behind animation — delay audio start
+                        _audioSource.PlayDelayed(_audioOffset);
+                    }
+                    else if (_audioOffset < 0f)
+                    {
+                        // Audio should lead animation — start audio and seek ahead
+                        _audioSource.Play();
+                        _audioSource.time = -_audioOffset;
+                    }
+                    else
+                    {
+                        _audioSource.Play();
+                    }
+                }
+
+                _playbackStartPending = false;
+                Debug.Log($"[HandAnimationPlayer] Playback started after {_startDelay}s delay (audioOffset={_audioOffset:F2}s)");
+                return;
             }
 
-            // Animator ignores clip.wrapMode — it only respects the clip's
-            // internal loopTime setting which can't be changed at runtime.
-            // So we manually loop by crossfading back to the start.
-            //
-            // With applyRootMotion = false, the Animator applies root position
-            // curves as regular property animations (absolute values, no deltas).
-            // No manual position reset is needed — the curves handle positioning
-            // continuously, and CrossFade blends position naturally from end → start.
-            if (_loop && _animator != null && _animator.runtimeAnimatorController != null)
+            // ── Runtime audio offset correction ──────────────────────────
+            // If the user adjusts _audioOffset in the Inspector at runtime,
+            // continuously nudge the audio time to stay in sync.
+            if (_audioSource != null && _audioSource.isPlaying && _animator.runtimeAnimatorController != null)
             {
-                // Don't re-trigger if already blending back to start
+                var stateInfo = _animator.GetCurrentAnimatorStateInfo(0);
+                float animTime = stateInfo.normalizedTime * stateInfo.length;
+                float expectedAudioTime = animTime - _audioOffset;
+
+                if (expectedAudioTime >= 0f && expectedAudioTime < _audioSource.clip.length)
+                {
+                    float drift = _audioSource.time - expectedAudioTime;
+                    // Only correct if drift exceeds 100ms to avoid constant jitter
+                    if (Mathf.Abs(drift) > 0.1f)
+                    {
+                        _audioSource.time = expectedAudioTime;
+                    }
+                }
+            }
+
+            // ── Loop handling ────────────────────────────────────────────
+            if (_loop && _animator.runtimeAnimatorController != null)
+            {
                 if (_animator.IsInTransition(0))
                     return;
 
@@ -138,12 +183,10 @@ namespace FingerPaint
                 {
                     if (_loopBlendDuration > 0f)
                     {
-                        // Smooth blend: crossfade from end pose back to start pose
                         _animator.CrossFade(stateInfo.shortNameHash, _loopBlendDuration, 0, 0f);
                     }
                     else
                     {
-                        // Hard snap back to start
                         _animator.Play(stateInfo.shortNameHash, 0, 0f);
                     }
 
@@ -166,8 +209,21 @@ namespace FingerPaint
         {
             if (_audioSource != null && _audioSource.clip != null)
             {
-                _audioSource.time = 0f;
-                _audioSource.Play();
+                if (_audioOffset > 0f)
+                {
+                    _audioSource.Stop();
+                    _audioSource.PlayDelayed(_audioOffset);
+                }
+                else if (_audioOffset < 0f)
+                {
+                    _audioSource.time = -_audioOffset;
+                    _audioSource.Play();
+                }
+                else
+                {
+                    _audioSource.time = 0f;
+                    _audioSource.Play();
+                }
             }
         }
 
@@ -268,8 +324,9 @@ namespace FingerPaint
             // so both hands maintain correct relative positioning.
             _animator.applyRootMotion = false;
 
-            // Force evaluate frame 0 so the hand snaps to its starting pose.
+            // Snap to frame 0 pose, then pause until start delay elapses
             _animator.Update(0f);
+            _animator.speed = 0f;
 
             // ── Voice audio ──────────────────────────────────────────────────
             if (_voiceClip != null)
@@ -288,16 +345,14 @@ namespace FingerPaint
 
                 // Remove MetaXRAudioSource if Meta's plugin auto-added it
                 DisableComponentByName(gameObject, "MetaXRAudioSource");
-
-                // Don't play yet — wait for first Update() so audio starts
-                // on the same frame the Animator begins ticking.
-                _audioStartPending = true;
-
-                Debug.Log($"[HandAnimationPlayer] Voice clip ready: \"{_voiceClip.name}\" ({_voiceClip.length:F2}s) — will start on first Update");
             }
 
+            // Both animation and audio wait for _startDelay before playing
+            _playbackStartPending = true;
+            _pendingStartTime = Time.time;
+
             Debug.Log($"[HandAnimationPlayer] Playback ready: {_handInstance.name} with {_animatorController.name} " +
-                      $"(loop={_loop}, animRoot={animRoot.name})");
+                      $"(loop={_loop}, animRoot={animRoot.name}, startDelay={_startDelay}s)");
         }
 
         // ─── Helpers ────────────────────────────────────────────────────
