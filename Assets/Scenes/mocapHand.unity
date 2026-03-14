@@ -1169,11 +1169,13 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::FingerPaint.HandAnimationPlayer
   _handPrefab: {fileID: 1678554349857304352, guid: 34a22dd67c1e5344591237fdd61e78ec, type: 3}
-  _animatorController: {fileID: 9100000, guid: dd4c856ce6f51c64aab0d53d3f5e9e3f, type: 2}
+  _animatorController: {fileID: 9100000, guid: b2ca67791e0795c478fb290e9ad12ebb, type: 2}
   _loop: 1
   _loopBlendDuration: 0.5
-  _voiceClip: {fileID: 8300000, guid: c8b52d88148e3d9409a7a0b5b26f9383, type: 3}
+  _voiceClip: {fileID: 8300000, guid: 319f7e783e20b4b4ab8d37597c8241b6, type: 3}
   _voiceVolume: 1
+  _startDelay: 2
+  _audioOffset: 0
   _handMaterial: {fileID: 2100000, guid: d0e81afd49d98447aaeb49b1bb2c0599, type: 2}
 --- !u!4 &1003847491
 Transform:
@@ -2312,11 +2314,13 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::FingerPaint.HandAnimationPlayer
   _handPrefab: {fileID: 6536860776232889746, guid: 70d02a90551f23042a882cdceeaf8e3a, type: 3}
-  _animatorController: {fileID: 9100000, guid: cf37ebc93028944498fc6a23e24012ac, type: 2}
+  _animatorController: {fileID: 9100000, guid: 1665bd83a00e5db4ab2bcd2d44aa69e8, type: 2}
   _loop: 1
   _loopBlendDuration: 0.5
   _voiceClip: {fileID: 0}
   _voiceVolume: 1
+  _startDelay: 2
+  _audioOffset: 0
   _handMaterial: {fileID: 2100000, guid: d0e81afd49d98447aaeb49b1bb2c0599, type: 2}
 --- !u!4 &1991463408
 Transform:

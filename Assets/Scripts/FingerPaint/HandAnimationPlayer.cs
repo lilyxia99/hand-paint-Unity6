@@ -155,10 +155,14 @@ namespace FingerPaint
             // ── Runtime audio offset correction ──────────────────────────
             // If the user adjusts _audioOffset in the Inspector at runtime,
             // continuously nudge the audio time to stay in sync.
-            if (_audioSource != null && _audioSource.isPlaying && _animator.runtimeAnimatorController != null)
+            // (Skip during transitions, as normalizedTime is unreliable while blending)
+            if (!_animator.IsInTransition(0) && _audioSource != null && _audioSource.isPlaying && _animator.runtimeAnimatorController != null)
             {
                 var stateInfo = _animator.GetCurrentAnimatorStateInfo(0);
-                float animTime = stateInfo.normalizedTime * stateInfo.length;
+                
+                // Use modulo 1.0f so if the animator state exceeds 1.0 (e.g. before loop resets),
+                // we don't calculate an expected audio time past the end of the clip.
+                float animTime = (stateInfo.normalizedTime % 1.0f) * stateInfo.length;
                 float expectedAudioTime = animTime - _audioOffset;
 
                 if (expectedAudioTime >= 0f && expectedAudioTime < _audioSource.clip.length)
