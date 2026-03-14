@@ -132,6 +132,9 @@ namespace FingerPaint.Editor
         private double _lastScrubEditorTime = -1;
         private bool _isScrubbing;
 
+        // ─── Voice Playback ───────────────────────────────────────────
+        private AudioSource _voiceAudioSource;
+
         // ─── UI State ───────────────────────────────────────────────────
         private GUIStyle _richTextStyle;
         private Vector2 _scrollPos = Vector2.zero;
@@ -180,6 +183,8 @@ namespace FingerPaint.Editor
                 _micRecorder = null;
             }
 
+            StopVoicePlayback();
+            DestroyVoiceAudioSource();
             StopVoiceScrub();
             DestroyGhosts();
         }
@@ -389,6 +394,8 @@ namespace FingerPaint.Editor
                 if (currentSpeedIdx < 0) currentSpeedIdx = 2; // default 1x
                 int newSpeedIdx = EditorGUILayout.Popup(currentSpeedIdx, _speedLabels, GUILayout.Width(55));
                 _playbackSpeed = _speedOptions[newSpeedIdx];
+                if (_isPlaying && _voiceAudioSource != null)
+                    _voiceAudioSource.pitch = _playbackSpeed;
 
                 GUILayout.EndHorizontal();
 
@@ -459,9 +466,9 @@ namespace FingerPaint.Editor
                 {
                     StopPlayback();
                     if (_leftClip != null)
-                        HandAnimationUtils.Trim(ref _leftClip, _trimMin, _trimMax);
+                        SafeTrim(ref _leftClip, _trimMin, _trimMax);
                     if (_rightClip != null)
-                        HandAnimationUtils.Trim(ref _rightClip, _trimMin, _trimMax);
+                        SafeTrim(ref _rightClip, _trimMin, _trimMax);
                     if (_voiceClip != null)
                         TrimVoiceClip(_trimMin, _trimMax);
                     _trimMin = 0f;
@@ -757,6 +764,92 @@ namespace FingerPaint.Editor
         }
 
         // ═══════════════════════════════════════════════════════════════
+        // Safe Trim (fixes Euler angle corruption in Meta SDK Trim)
+        // ═══════════════════════════════════════════════════════════════
+
+        /// <summary>
+        /// Trims an AnimationClip to the normalized [minTime, maxTime] range.
+        /// Only resamples a small buffer zone around trim boundaries to prevent
+        /// Euler/tangent corruption, while keeping existing keyframes in the
+        /// middle for speed.
+        /// </summary>
+        private void SafeTrim(ref AnimationClip clip, float minTime, float maxTime)
+        {
+            EditorCurveBinding[] bindings = AnimationUtility.GetCurveBindings(clip);
+
+            float min = minTime * clip.length;
+            float max = maxTime * clip.length;
+            float frameRate = clip.frameRate > 0 ? clip.frameRate : 30f;
+            float dt = 1f / frameRate;
+
+            // Buffer zone: resample this many seconds around each boundary
+            float bufferSec = 0.5f;
+            float safeStart = min + bufferSec; // end of start-buffer
+            float safeEnd = max - bufferSec;   // start of end-buffer
+
+            foreach (var binding in bindings)
+            {
+                AnimationCurve srcCurve = AnimationUtility.GetEditorCurve(clip, binding);
+                var newKeys = new List<Keyframe>();
+
+                // 1) Resample the START boundary zone [min, min+buffer]
+                for (float t = min; t < Mathf.Min(safeStart, max); t += dt)
+                {
+                    newKeys.Add(new Keyframe(t - min, srcCurve.Evaluate(t)));
+                }
+
+                // 2) Keep existing keyframes in the safe MIDDLE zone
+                if (safeStart < safeEnd)
+                {
+                    Keyframe[] srcKeys = srcCurve.keys;
+                    for (int k = 0; k < srcKeys.Length; k++)
+                    {
+                        float kt = srcKeys[k].time;
+                        if (kt >= safeStart && kt <= safeEnd)
+                        {
+                            Keyframe kf = srcKeys[k];
+                            kf.time -= min;
+                            newKeys.Add(kf);
+                        }
+                    }
+                }
+
+                // 3) Resample the END boundary zone [max-buffer, max]
+                float endStart = Mathf.Max(safeEnd, min);
+                // Avoid re-adding the overlap if start+end buffers overlap
+                if (endStart < safeStart) endStart = safeStart;
+                for (float t = endStart; t <= max + dt * 0.25f; t += dt)
+                {
+                    float clamped = Mathf.Min(t, max);
+                    newKeys.Add(new Keyframe(clamped - min, srcCurve.Evaluate(clamped)));
+                }
+
+                // Build new curve, sort by time to handle any overlap
+                newKeys.Sort((a, b) => a.time.CompareTo(b.time));
+
+                // Remove duplicate times (keep last)
+                for (int i = newKeys.Count - 1; i > 0; i--)
+                {
+                    if (Mathf.Approximately(newKeys[i].time, newKeys[i - 1].time))
+                        newKeys.RemoveAt(i - 1);
+                }
+
+                AnimationCurve newCurve = new AnimationCurve(newKeys.ToArray());
+
+                // Smooth tangents
+                for (int i = 0; i < newCurve.keys.Length; i++)
+                {
+                    AnimationUtility.SetKeyLeftTangentMode(newCurve, i,
+                        AnimationUtility.TangentMode.ClampedAuto);
+                    AnimationUtility.SetKeyRightTangentMode(newCurve, i,
+                        AnimationUtility.TangentMode.ClampedAuto);
+                }
+
+                AnimationUtility.SetEditorCurve(clip, binding, newCurve);
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════
         // Voice Trim
         // ═══════════════════════════════════════════════════════════════
 
@@ -887,24 +980,67 @@ namespace FingerPaint.Editor
         }
 
         /// <summary>
-        /// Start playing the voice clip from a normalized position, synced to animation.
+        /// Start playing the voice clip from a normalized position.
+        /// Uses AudioSource during Play Mode, AudioUtilReflection in Edit Mode.
         /// </summary>
         private void StartVoicePlayback(float normalizedTime)
         {
             if (_voiceClip == null) return;
-            int samplePos = Mathf.Clamp(
-                (int)(normalizedTime * _voiceClip.samples),
-                0, _voiceClip.samples - 1);
-            AudioUtilReflection.StopAllPreviewClips();
-            AudioUtilReflection.PlayPreviewClip(_voiceClip, samplePos, false);
+
+            StopVoicePlayback(); // stop any existing playback first
+
+            if (Application.isPlaying)
+            {
+                // Play Mode: use a runtime AudioSource (reliable)
+                EnsureVoiceAudioSource();
+                _voiceAudioSource.clip = _voiceClip;
+                _voiceAudioSource.time = Mathf.Clamp(
+                    normalizedTime * _voiceClip.length,
+                    0f, _voiceClip.length - 0.01f);
+                _voiceAudioSource.pitch = _playbackSpeed;
+                _voiceAudioSource.Play();
+            }
+            else
+            {
+                // Edit Mode: use AudioUtil reflection (only option in Edit Mode)
+                int samplePos = Mathf.Clamp(
+                    (int)(normalizedTime * _voiceClip.samples),
+                    0, _voiceClip.samples - 1);
+                AudioUtilReflection.StopAllPreviewClips();
+                AudioUtilReflection.PlayPreviewClip(_voiceClip, samplePos, false);
+            }
         }
 
         /// <summary>
-        /// Stop voice clip playback.
+        /// Stop voice clip playback (both Play Mode and Edit Mode).
         /// </summary>
         private void StopVoicePlayback()
         {
+            // Stop runtime AudioSource
+            if (_voiceAudioSource != null && _voiceAudioSource.isPlaying)
+                _voiceAudioSource.Stop();
+
+            // Stop editor preview
             AudioUtilReflection.StopAllPreviewClips();
+        }
+
+        private void EnsureVoiceAudioSource()
+        {
+            if (_voiceAudioSource != null) return;
+            var go = new GameObject("[DualHandRecorder_VoicePreview]");
+            go.hideFlags = HideFlags.HideAndDontSave;
+            _voiceAudioSource = go.AddComponent<AudioSource>();
+            _voiceAudioSource.playOnAwake = false;
+            _voiceAudioSource.spatialBlend = 0f; // 2D audio
+        }
+
+        private void DestroyVoiceAudioSource()
+        {
+            if (_voiceAudioSource != null)
+            {
+                DestroyImmediate(_voiceAudioSource.gameObject);
+                _voiceAudioSource = null;
+            }
         }
 
         /// <summary>
