@@ -346,8 +346,9 @@ namespace FingerPaint.Editor
                 bool playbackSliderChanged = !Mathf.Approximately(prevPlayback, _playbackNormalizedTime);
                 if (playbackSliderChanged && _isPlaying)
                 {
-                    // User dragged slider while playing — update the time base
+                    // User dragged slider while playing — resync voice from new position
                     _lastPlaybackEditorTime = EditorApplication.timeSinceStartup;
+                    StartVoicePlayback(_playbackNormalizedTime);
                 }
 
                 // Play/Pause + Speed
@@ -358,9 +359,15 @@ namespace FingerPaint.Editor
                 if (GUILayout.Button(playLabel, GUILayout.Height(30), GUILayout.Width(100)))
                 {
                     if (_isPlaying)
+                    {
                         StopPlayback();
+                        StopVoicePlayback();
+                    }
                     else
+                    {
                         StartPlayback();
+                        StartVoicePlayback(_playbackNormalizedTime);
+                    }
                     Repaint();
                 }
                 GUI.backgroundColor = Color.white;
@@ -370,6 +377,10 @@ namespace FingerPaint.Editor
                     _playbackNormalizedTime = 0f;
                     _lastPlaybackEditorTime = EditorApplication.timeSinceStartup;
                     playbackSliderChanged = true;
+                    if (_isPlaying)
+                        StartVoicePlayback(0f);
+                    else
+                        StopVoicePlayback();
                 }
 
                 // Speed selector
@@ -489,6 +500,7 @@ namespace FingerPaint.Editor
                         {
                             _playbackNormalizedTime = 1f;
                             StopPlayback();
+                            StopVoicePlayback();
                         }
                     }
                     _lastPlaybackEditorTime = now;
@@ -872,6 +884,27 @@ namespace FingerPaint.Editor
         {
             _isPlaying = false;
             _lastPlaybackEditorTime = -1;
+        }
+
+        /// <summary>
+        /// Start playing the voice clip from a normalized position, synced to animation.
+        /// </summary>
+        private void StartVoicePlayback(float normalizedTime)
+        {
+            if (_voiceClip == null) return;
+            int samplePos = Mathf.Clamp(
+                (int)(normalizedTime * _voiceClip.samples),
+                0, _voiceClip.samples - 1);
+            AudioUtilReflection.StopAllPreviewClips();
+            AudioUtilReflection.PlayPreviewClip(_voiceClip, samplePos, false);
+        }
+
+        /// <summary>
+        /// Stop voice clip playback.
+        /// </summary>
+        private void StopVoicePlayback()
+        {
+            AudioUtilReflection.StopAllPreviewClips();
         }
 
         /// <summary>
