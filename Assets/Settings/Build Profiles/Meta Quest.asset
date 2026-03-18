@@ -41,7 +41,7 @@ MonoBehaviour:
     - line: '|   cursorHotspot: {x: 0, y: 0}'
     - line: '|   m_SplashScreenBackgroundColor: {r: 0.13725491, g: 0.12156863, b:
         0.1254902, a: 1}'
-    - line: '|   m_ShowUnitySplashScreen: 1'
+    - line: '|   m_ShowUnitySplashScreen: 0'
     - line: '|   m_ShowUnitySplashLogo: 1'
     - line: '|   m_SplashScreenOverlayOpacity: 1'
     - line: '|   m_SplashScreenAnimation: 1'
@@ -170,8 +170,6 @@ MonoBehaviour:
     - line: '|   bundleVersion: 9.2.1'
     - line: '|   preloadedAssets:'
     - line: '|   - {fileID: 11400000, guid: d232a279f47394c44aff95b839f7c88e, type:
-        2}'
-    - line: '|   - {fileID: 11400000, guid: 09b263a861d8b324a9bc5deae085e5ce, type:
         2}'
     - line: '|   metroInputSource: 0'
     - line: '|   wsaTransparentSwapchain: 0'
@@ -1060,7 +1058,7 @@ MonoBehaviour:
     - rid: 6031320567302324297
       type: {class: AndroidPlatformBuildSettings, ns: UnityEditor.Android, asm: UnityEditor.Android.Extensions}
       data:
-        m_Development: 0
+        m_Development: 1
         m_ConnectProfiler: 0
         m_BuildWithDeepProfilingSupport: 0
         m_AllowDebugging: 0
@@ -1079,8 +1077,8 @@ MonoBehaviour:
         m_ExportAsGoogleAndroidProject: 0
         m_DebugSymbolLevel: 4
         m_DebugSymbolFormat: 5
-        m_CurrentDeploymentTargetId: __builtin__target_default
-        m_BuildType: 2
+        m_CurrentDeploymentTargetId: 2G97C5ZH9201D3
+        m_BuildType: 1
         m_LinkTimeOptimization: 1
         m_BuildAppBundle: 0
         m_IPAddressToConnect: 
