@@ -32,7 +32,7 @@ Material:
     - _EnableFresnel: 1
     - _FresnelPower: 2.5
     - _FresnelScale: 0.8
-    - _Opacity: 0.067
+    - _Opacity: 0.021
     m_Colors:
     - _BaseColor: {r: 1, g: 0.4, b: 0.2, a: 0.5}
     - _EmissionColor: {r: 1, g: 0.4, b: 0.2, a: 1}
