@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace FingerPaint
@@ -47,6 +48,13 @@ namespace FingerPaint
         [Tooltip("Shift audio relative to animation (seconds). Positive = audio plays later, negative = earlier. Adjustable at runtime in Inspector.")]
         [SerializeField] [Range(-2f, 2f)] private float _audioOffset = 0f;
 
+        [Header("Subtitles (optional)")]
+        [Tooltip("SRT subtitle file imported as TextAsset. Rename your .srt to .srt.txt so Unity imports it.")]
+        [SerializeField] private TextAsset _subtitleFile;
+
+        [Tooltip("Reference to a SubtitleDisplay component in the scene.")]
+        [SerializeField] private SubtitleDisplay _subtitleDisplay;
+
         [Header("Material Override")]
         [Tooltip("Optional material to apply to the hand mesh. Leave null for the prefab default.")]
         [SerializeField] private Material _handMaterial;
@@ -58,6 +66,7 @@ namespace FingerPaint
         private AudioSource _audioSource;
         private bool _playbackStartPending;
         private float _pendingStartTime;
+        private List<SrtParser.SrtEntry> _subtitleEntries;
 
         // ─── Public API ─────────────────────────────────────────────────
 
@@ -113,6 +122,10 @@ namespace FingerPaint
             }
 
             SetupHand();
+
+            // Parse subtitle file if assigned
+            if (_subtitleFile != null)
+                _subtitleEntries = SrtParser.Parse(_subtitleFile.text);
         }
 
         private void Update()
@@ -176,6 +189,14 @@ namespace FingerPaint
                 }
             }
 
+            // ── Subtitle update ─────────────────────────────────────────
+            if (_subtitleEntries != null && _subtitleDisplay != null && _audioSource != null)
+            {
+                float subTime = _audioSource.isPlaying ? _audioSource.time : -1f;
+                string text = SrtParser.GetTextAtTime(_subtitleEntries, subTime);
+                _subtitleDisplay.SetText(text);
+            }
+
             // ── Loop handling ────────────────────────────────────────────
             if (_loop && _animator.runtimeAnimatorController != null)
             {
@@ -207,6 +228,9 @@ namespace FingerPaint
 
             if (_audioSource != null)
                 Destroy(_audioSource);
+
+            if (_subtitleDisplay != null)
+                _subtitleDisplay.Clear();
         }
 
         private void RestartAudio()
