@@ -191,10 +191,6 @@ namespace FingerPaint
                 yield break;
             }
 
-            // Pick device based on retry count (try each device in order)
-            int deviceIndex = Mathf.Clamp(_retryCount, 0, MicDeviceCount - 1);
-            _micDeviceName = Microphone.devices[deviceIndex];
-
             // Log all devices on first attempt so we can diagnose
             if (_retryCount == 0)
             {
@@ -205,140 +201,157 @@ namespace FingerPaint
                 }
             }
 
-            Debug.Log($"[VoiceDetector] Trying device [{deviceIndex}]: \"{_micDeviceName}\"");
+            // ── Build a list of (deviceName, sampleRate) combos to try ──
+            // On Android/Quest, null = system default mic (most reliable)
+            var attempts = new System.Collections.Generic.List<(string device, int rate)>();
 
-            // Query supported frequency range for chosen device
-            Microphone.GetDeviceCaps(_micDeviceName, out int minFreq, out int maxFreq);
-
-            // If min/max are both 0, the device supports any rate; otherwise clamp
-            int effectiveRate = _sampleRate;
-            if (minFreq != 0 || maxFreq != 0)
-            {
-                effectiveRate = Mathf.Clamp(_sampleRate, minFreq, maxFreq);
-                if (effectiveRate != _sampleRate)
-                    Debug.Log($"[VoiceDetector] Clamped sample rate {_sampleRate} → {effectiveRate} Hz");
-            }
-
-            Debug.Log($"[VoiceDetector] Starting mic: \"{_micDeviceName}\" @ {effectiveRate} Hz, " +
-                      $"buffer {_clipLengthSeconds}s");
-
-            // Stop any previous recording on any device
+#if UNITY_ANDROID && !UNITY_EDITOR
+            // Quest: try null (system default) first, at both configured and 48kHz
+            attempts.Add((null, _sampleRate));
+            if (_sampleRate != 48000)
+                attempts.Add((null, 48000));
+#endif
+            // Then try each named device at configured rate
             for (int i = 0; i < MicDeviceCount; i++)
+                attempts.Add((Microphone.devices[i], _sampleRate));
+
+            // Then try each named device at 48kHz (Quest often needs this)
+            if (_sampleRate != 48000)
             {
-                if (Microphone.IsRecording(Microphone.devices[i]))
-                    Microphone.End(Microphone.devices[i]);
+                for (int i = 0; i < MicDeviceCount; i++)
+                    attempts.Add((Microphone.devices[i], 48000));
             }
 
-            _micClip = Microphone.Start(_micDeviceName, loop: true, _clipLengthSeconds, effectiveRate);
+            // Skip already-tried attempts
+            int startIdx = Mathf.Clamp(_retryCount, 0, attempts.Count - 1);
 
-            if (_micClip == null)
+            for (int attempt = startIdx; attempt < attempts.Count; attempt++)
             {
-                Debug.LogError("[VoiceDetector] Microphone.Start returned null AudioClip!");
-                IsMicrophoneAvailable = false;
-                yield break;
-            }
+                _retryCount = attempt;
+                var (deviceName, targetRate) = attempts[attempt];
 
-            // Wait real frames for the mic to start producing samples (up to 2 seconds)
-            float waitTime = 0f;
-            while (Microphone.GetPosition(_micDeviceName) <= 0 && waitTime < 2f)
-            {
-                waitTime += Time.unscaledDeltaTime;
-                yield return null;
-            }
+                string displayName = deviceName ?? "(null/system default)";
+                Debug.Log($"[VoiceDetector] Attempt [{attempt}]: device=\"{displayName}\" @ {targetRate} Hz");
 
-            if (Microphone.GetPosition(_micDeviceName) <= 0)
-            {
-                Debug.LogWarning($"[VoiceDetector] Mic \"{_micDeviceName}\" did not produce samples after {waitTime:F1}s.");
-                Microphone.End(_micDeviceName);
-                if (_micClip != null) { Destroy(_micClip); _micClip = null; }
+                // Query supported frequency range
+                Microphone.GetDeviceCaps(deviceName, out int minFreq, out int maxFreq);
 
-                // Try next device
-                _retryCount++;
-                if (_retryCount < MicDeviceCount)
+                int effectiveRate = targetRate;
+                if (minFreq != 0 || maxFreq != 0)
                 {
-                    _micDeviceName = Microphone.devices[_retryCount];
-                    Debug.Log($"[VoiceDetector] Trying next device [{_retryCount}]: \"{_micDeviceName}\"");
-                    yield return new WaitForSeconds(0.3f);
-                    _startCoroutine = StartCoroutine(StartMicrophoneCoroutine());
-                    yield break;
+                    effectiveRate = Mathf.Clamp(targetRate, minFreq, maxFreq);
+                    if (effectiveRate != targetRate)
+                        Debug.Log($"[VoiceDetector] Clamped rate {targetRate} → {effectiveRate} Hz");
                 }
-                else
+
+                // Stop any previous recording
+                for (int i = 0; i < MicDeviceCount; i++)
                 {
-                    Debug.LogError("[VoiceDetector] All mic devices failed. Giving up.");
-                    IsMicrophoneAvailable = false;
-                    yield break;
+                    if (Microphone.IsRecording(Microphone.devices[i]))
+                        Microphone.End(Microphone.devices[i]);
                 }
-            }
+                if (Microphone.IsRecording(null))
+                    Microphone.End(null);
 
-            // Pre-allocate a buffer for ~100 ms of audio at the effective rate
-            int samplesPerChunk = Mathf.Max(1, effectiveRate / 10);
-            _sampleBuffer = new float[samplesPerChunk];
-            _lastSamplePosition = Microphone.GetPosition(_micDeviceName);
+                _micDeviceName = deviceName;
+                _micClip = Microphone.Start(deviceName, loop: true, _clipLengthSeconds, effectiveRate);
 
-            // Verify actual audio data is non-zero (wait up to 1 second)
-            float verifyTime = 0f;
-            bool hasRealData = false;
-            while (verifyTime < 1f)
-            {
-                verifyTime += Time.unscaledDeltaTime;
-                yield return null;
-
-                int pos = Microphone.GetPosition(_micDeviceName);
-                if (pos != _lastSamplePosition && pos > 0)
+                if (_micClip == null)
                 {
-                    // Read a small chunk and check for non-zero samples
-                    int checkCount = Mathf.Min(256, _sampleBuffer.Length);
-                    float[] checkBuf = new float[checkCount];
-                    int readPos = pos - checkCount;
-                    if (readPos < 0) readPos += _micClip.samples;
-                    _micClip.GetData(checkBuf, readPos);
-
-                    float maxSample = 0f;
-                    for (int i = 0; i < checkCount; i++)
-                        maxSample = Mathf.Max(maxSample, Mathf.Abs(checkBuf[i]));
-
-                    if (maxSample > 0.0001f)
-                    {
-                        hasRealData = true;
-                        Debug.Log($"[VoiceDetector] Verified real audio data (peak: {maxSample:F6}).");
-                        break;
-                    }
+                    Debug.LogWarning($"[VoiceDetector] Microphone.Start returned null for \"{displayName}\"");
+                    continue;
                 }
-            }
 
-            if (!hasRealData)
-            {
-                Debug.LogWarning($"[VoiceDetector] Mic \"{_micDeviceName}\" produces only silence.");
-                Microphone.End(_micDeviceName);
-                if (_micClip != null) { Destroy(_micClip); _micClip = null; }
-
-                // Try next device
-                _retryCount++;
-                if (_retryCount < MicDeviceCount)
+                // Wait for mic to start producing samples (up to 3 seconds for Quest)
+                float waitTime = 0f;
+                while (Microphone.GetPosition(deviceName) <= 0 && waitTime < 3f)
                 {
-                    _micDeviceName = Microphone.devices[_retryCount];
-                    Debug.Log($"[VoiceDetector] Trying next device [{_retryCount}]: \"{_micDeviceName}\"");
-                    yield return new WaitForSeconds(0.3f);
-                    _startCoroutine = StartCoroutine(StartMicrophoneCoroutine());
-                    yield break;
-                }
-                else
-                {
-                    Debug.LogWarning("[VoiceDetector] All devices produced silence — using last one anyway.");
-                    // Fall through and use the last device as a best effort
-                    _micDeviceName = Microphone.devices[0];
-                    Microphone.Start(_micDeviceName, loop: true, _clipLengthSeconds, effectiveRate);
+                    waitTime += Time.unscaledDeltaTime;
                     yield return null;
                 }
+
+                if (Microphone.GetPosition(deviceName) <= 0)
+                {
+                    Debug.LogWarning($"[VoiceDetector] Mic \"{displayName}\" produced no samples after {waitTime:F1}s");
+                    Microphone.End(deviceName);
+                    if (_micClip != null) { Destroy(_micClip); _micClip = null; }
+                    yield return new WaitForSeconds(0.3f);
+                    continue;
+                }
+
+                // Pre-allocate a buffer for ~100 ms of audio
+                int samplesPerChunk = Mathf.Max(1, effectiveRate / 10);
+                _sampleBuffer = new float[samplesPerChunk];
+                _lastSamplePosition = Microphone.GetPosition(deviceName);
+
+                // Verify actual audio data is non-zero (wait up to 2 seconds)
+                float verifyTime = 0f;
+                bool hasRealData = false;
+                while (verifyTime < 2f)
+                {
+                    verifyTime += Time.unscaledDeltaTime;
+                    yield return null;
+
+                    int pos = Microphone.GetPosition(deviceName);
+                    if (pos != _lastSamplePosition && pos > 0)
+                    {
+                        int checkCount = Mathf.Min(256, _sampleBuffer.Length);
+                        float[] checkBuf = new float[checkCount];
+                        int readPos = pos - checkCount;
+                        if (readPos < 0) readPos += _micClip.samples;
+                        _micClip.GetData(checkBuf, readPos);
+
+                        float maxSample = 0f;
+                        for (int i = 0; i < checkCount; i++)
+                            maxSample = Mathf.Max(maxSample, Mathf.Abs(checkBuf[i]));
+
+                        if (maxSample > 0.0001f)
+                        {
+                            hasRealData = true;
+                            Debug.Log($"[VoiceDetector] Verified real audio (peak: {maxSample:F6}) on \"{displayName}\" @ {effectiveRate} Hz");
+                            break;
+                        }
+                    }
+                }
+
+                if (hasRealData)
+                {
+                    // Success!
+                    _retryCount = 0;
+                    _lastSamplePosition = Microphone.GetPosition(deviceName);
+                    IsMicrophoneAvailable = true;
+                    Debug.Log($"[VoiceDetector] Microphone ready: \"{displayName}\", " +
+                              $"clip: {_micClip.samples} samples, {_micClip.channels} ch, " +
+                              $"rate: {effectiveRate} Hz, position: {_lastSamplePosition}");
+                    yield break;
+                }
+                else
+                {
+                    Debug.LogWarning($"[VoiceDetector] Mic \"{displayName}\" @ {effectiveRate} Hz produces only silence.");
+                    Microphone.End(deviceName);
+                    if (_micClip != null) { Destroy(_micClip); _micClip = null; }
+                    yield return new WaitForSeconds(0.3f);
+                }
             }
 
-            _retryCount = 0;
+            // All attempts exhausted — use first device as best effort
+            Debug.LogWarning("[VoiceDetector] All mic attempts failed. Using first device as best effort.");
+            _micDeviceName = Microphone.devices[0];
+
+#if UNITY_ANDROID && !UNITY_EDITOR
+            // On Quest, try null as last resort
+            _micDeviceName = null;
+#endif
+            _micClip = Microphone.Start(_micDeviceName, loop: true, _clipLengthSeconds, 48000);
+            yield return null;
+
+            int fallbackChunk = Mathf.Max(1, 48000 / 10);
+            _sampleBuffer = new float[fallbackChunk];
             _lastSamplePosition = Microphone.GetPosition(_micDeviceName);
 
+            _retryCount = 0;
             IsMicrophoneAvailable = true;
-            Debug.Log($"[VoiceDetector] Microphone ready: \"{_micDeviceName}\", " +
-                      $"clip: {_micClip.samples} samples, {_micClip.channels} ch, " +
-                      $"position: {_lastSamplePosition}");
+            Debug.Log($"[VoiceDetector] Best-effort mic ready: \"{_micDeviceName ?? "(null)"}\" @ 48000 Hz");
         }
 
         private void StopMicrophone()

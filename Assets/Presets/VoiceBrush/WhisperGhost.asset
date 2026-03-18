@@ -15,7 +15,7 @@ MonoBehaviour:
   BaseColor: {r: 0.7, g: 0.8, b: 1, a: 1}
   BaseEmissionColor: {r: 0.5, g: 0.6, b: 1, a: 1}
   BaseEmissionIntensity: 0.15
-  BaseOpacity: 0.1
+  BaseOpacity: 0.024
   BaseSizeMultiplier: 0.8
   BaseMeshIndex: 0
   BaseFresnelScale: 1.2

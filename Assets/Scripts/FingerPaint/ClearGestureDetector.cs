@@ -13,6 +13,8 @@ namespace FingerPaint
         [SerializeField] private HandTrackingManager _handTracking;
         [SerializeField] private FingerPainter _painter;
         [SerializeField] private ClearConfirmationUI _confirmUI;
+        [SerializeField] private PalmMenuUI _palmMenu;
+        [SerializeField] private ActionFeedbackUI _feedbackUI;
 
         [Header("Gesture Settings")]
         [Tooltip("Maximum distance between thumb and middle finger tips to count as pinch (meters).")]
@@ -136,48 +138,49 @@ namespace FingerPaint
         // ─── Gesture detection ──────────────────────────────────────────
 
         /// <summary>
-        /// Detects thumb + middle finger pinch with palm facing toward the user.
-        /// Checks either hand.
+        /// Detects thumb + middle finger pinch on the RIGHT hand only,
+        /// guarded by palm gaze (user must be looking at the palm).
+        /// Falls back to own palm check if PalmMenuUI is not assigned.
         /// </summary>
         private bool DetectClearPinch()
         {
-            Camera cam = Camera.main;
-            if (cam == null) return false;
-
-            for (int hand = 0; hand < 2; hand++)
+            // If PalmMenuUI is set, use its gaze state
+            if (_palmMenu != null)
             {
-                bool isLeft = hand == 0;
-                int offset = isLeft ? 0 : 5;
+                if (!_palmMenu.IsGazingRightPalm)
+                    return false;
+            }
+            else
+            {
+                // Fallback: do our own palm gaze check
+                Camera cam = Camera.main;
+                if (cam == null) return false;
 
-                int thumbIdx = offset + 0;  // Thumb
-                int middleIdx = offset + 2; // Middle
+                if (!_handTracking.TryGetPalmPose(false, out Vector3 palmPos, out Vector3 palmNormal))
+                    return false;
 
-                ref var thumb = ref _handTracking.Fingers[thumbIdx];
-                ref var middle = ref _handTracking.Fingers[middleIdx];
+                Vector3 dirToCamera = (cam.transform.position - palmPos).normalized;
+                if (Vector3.Dot(palmNormal, dirToCamera) < _palmFacingDotThreshold)
+                    return false;
 
-                if (!thumb.IsTracked || !middle.IsTracked)
-                    continue;
-
-                // Check pinch distance
-                float dist = Vector3.Distance(thumb.TipPosition, middle.TipPosition);
-                if (dist > _pinchThreshold)
-                    continue;
-
-                // Check palm facing toward the user (camera)
-                if (!_handTracking.TryGetPalmNormal(isLeft, out Vector3 palmNormal))
-                    continue;
-
-                Vector3 handCenter = (thumb.TipPosition + middle.TipPosition) * 0.5f;
-                Vector3 dirToCamera = (cam.transform.position - handCenter).normalized;
-
-                float dot = Vector3.Dot(palmNormal, dirToCamera);
-                if (dot < _palmFacingDotThreshold)
-                    continue;
-
-                return true;
+                Vector3 dirToPalm = (palmPos - cam.transform.position).normalized;
+                if (Vector3.Dot(cam.transform.forward, dirToPalm) < 0.7f)
+                    return false;
             }
 
-            return false;
+            // Right hand only
+            int thumbIdx = (int)HandTrackingManager.FingerID.RightThumb;
+            int middleIdx = (int)HandTrackingManager.FingerID.RightMiddle;
+
+            ref var thumb = ref _handTracking.Fingers[thumbIdx];
+            ref var middle = ref _handTracking.Fingers[middleIdx];
+
+            if (!thumb.IsTracked || !middle.IsTracked)
+                return false;
+
+            // Check pinch distance
+            float dist = Vector3.Distance(thumb.TipPosition, middle.TipPosition);
+            return dist < _pinchThreshold;
         }
 
         // ─── Actions ────────────────────────────────────────────────────
@@ -201,6 +204,9 @@ namespace FingerPaint
         {
             if (_painter != null)
                 _painter.ClearAll();
+
+            if (_feedbackUI != null)
+                _feedbackUI.Show("\u2713 Cleared!");
         }
     }
 }

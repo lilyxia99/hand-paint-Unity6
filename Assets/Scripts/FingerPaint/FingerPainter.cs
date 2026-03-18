@@ -80,6 +80,15 @@ namespace FingerPaint
         [Tooltip("How long a temporary ball takes to fade out once marked for removal (seconds).")]
         [SerializeField] private float _fadeOutDuration = 1.5f;
 
+        [Tooltip("Seconds before a temporary ball auto-fades regardless of hand movement. 0 = count-based only.")]
+        [SerializeField] private float _tempBallLifetime = 3.0f;
+
+        [Tooltip("Whether temporary balls auto-fade based on lifetime even when hands are idle.")]
+        [SerializeField] private bool _fadeWhenIdle = true;
+
+        [Tooltip("Curve shaping the fade-out (X = 0..1 normalised time, Y = 1..0 opacity). Defaults to ease-in.")]
+        [SerializeField] private AnimationCurve _tempFadeCurve = AnimationCurve.EaseInOut(0f, 1f, 1f, 0f);
+
         [Tooltip("Base color for temporary (silent) balls.")]
         [SerializeField] private Color _tempBallColor = new Color(0.6f, 0.6f, 0.8f, 1f);
 
@@ -145,6 +154,7 @@ namespace FingerPaint
             public MeshRenderer Renderer;
             public MaterialPropertyBlock PropBlock;
             public float FadeStartTime; // -1 = not fading
+            public float SpawnTime;     // when this ball was created
             public float BaseOpacity;
         }
 
@@ -383,6 +393,7 @@ namespace FingerPaint
                 Renderer = mr,
                 PropBlock = propBlock,
                 FadeStartTime = -1f,
+                SpawnTime = Time.time,
                 BaseOpacity = _tempBallOpacity
             };
             _tempCount++;
@@ -392,7 +403,9 @@ namespace FingerPaint
 
         private void UpdateTemporaryBalls()
         {
-            // Phase 1: Mark oldest non-fading balls for fade if count exceeds limit
+            float now = Time.time;
+
+            // Phase 1a: Mark oldest non-fading balls for fade if count exceeds limit
             int activeCount = _tempCount - _tempFadingCount;
             int excess = activeCount - _maxTemporaryBalls;
 
@@ -404,9 +417,29 @@ namespace FingerPaint
                     int idx = (_tempHead + i) % RingBufferCapacity;
                     if (_tempRing[idx].FadeStartTime < 0f)
                     {
-                        _tempRing[idx].FadeStartTime = Time.time;
+                        _tempRing[idx].FadeStartTime = now;
                         _tempFadingCount++;
                         marked++;
+                    }
+                }
+            }
+
+            // Phase 1b: Time-based auto-fade — mark any ball past its lifetime
+            if (_fadeWhenIdle && _tempBallLifetime > 0f)
+            {
+                for (int i = 0; i < _tempCount; i++)
+                {
+                    int idx = (_tempHead + i) % RingBufferCapacity;
+                    ref var ball = ref _tempRing[idx];
+
+                    if (ball.FadeStartTime >= 0f)
+                        continue; // already fading
+
+                    float age = now - ball.SpawnTime;
+                    if (age >= _tempBallLifetime)
+                    {
+                        ball.FadeStartTime = now;
+                        _tempFadingCount++;
                     }
                 }
             }
@@ -420,7 +453,7 @@ namespace FingerPaint
                 if (ball.FadeStartTime < 0f)
                     break;
 
-                float elapsed = Time.time - ball.FadeStartTime;
+                float elapsed = now - ball.FadeStartTime;
                 if (elapsed >= _fadeOutDuration)
                 {
                     // Fully faded — destroy and dequeue
@@ -434,9 +467,10 @@ namespace FingerPaint
                 }
                 else
                 {
-                    // Still fading — update opacity
+                    // Still fading — evaluate curve for opacity
                     float t = elapsed / _fadeOutDuration;
-                    float newOpacity = Mathf.Lerp(ball.BaseOpacity, 0f, t);
+                    float curveValue = _tempFadeCurve.Evaluate(t);
+                    float newOpacity = ball.BaseOpacity * curveValue;
 
                     if (ball.Renderer != null)
                     {
@@ -457,7 +491,7 @@ namespace FingerPaint
                 if (ball.FadeStartTime < 0f)
                     continue;
 
-                float elapsed = Time.time - ball.FadeStartTime;
+                float elapsed = now - ball.FadeStartTime;
                 if (elapsed >= _fadeOutDuration)
                 {
                     // Can't dequeue from middle of ring buffer, just destroy GO
@@ -470,7 +504,8 @@ namespace FingerPaint
                 else
                 {
                     float t = elapsed / _fadeOutDuration;
-                    float newOpacity = Mathf.Lerp(ball.BaseOpacity, 0f, t);
+                    float curveValue = _tempFadeCurve.Evaluate(t);
+                    float newOpacity = ball.BaseOpacity * curveValue;
 
                     if (ball.Renderer != null)
                     {

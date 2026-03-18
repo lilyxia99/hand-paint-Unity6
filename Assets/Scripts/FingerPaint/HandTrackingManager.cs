@@ -194,6 +194,27 @@ namespace FingerPaint
             return true;
         }
 
+        /// <summary>
+        /// Returns the palm position and outward-facing normal for the specified hand.
+        /// </summary>
+        public bool TryGetPalmPose(bool leftHand, out Vector3 palmPosition, out Vector3 palmNormal)
+        {
+            palmPosition = Vector3.zero;
+            palmNormal = Vector3.zero;
+            XRHand hand = GetHand(leftHand);
+
+            if (!hand.isTracked)
+                return false;
+
+            var palmJoint = hand.GetJoint(XRHandJointID.Palm);
+            if (!palmJoint.TryGetPose(out Pose palmPose))
+                return false;
+
+            palmPosition = palmPose.position;
+            palmNormal = -palmPose.forward;
+            return true;
+        }
+
         private XRHand GetHand(bool left)
         {
             if (_handSubsystem == null)

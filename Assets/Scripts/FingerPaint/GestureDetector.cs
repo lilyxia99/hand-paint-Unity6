@@ -13,6 +13,7 @@ namespace FingerPaint
         [SerializeField] private HandTrackingManager _handTracking;
         [SerializeField] private MeshExporter _exporter;
         [SerializeField] private ClearGestureDetector _clearDetector;
+        [SerializeField] private ActionFeedbackUI _feedbackUI;
 
         [Header("Gesture Timing")]
         [SerializeField] private float _holdDuration = 1.0f;   // seconds to hold before trigger
@@ -72,6 +73,9 @@ namespace FingerPaint
 
             if (_exporter != null)
                 _exporter.Export();
+
+            if (_feedbackUI != null)
+                _feedbackUI.Show("\u2713 Saved!");
 
             OnSaveGestureDetected?.Invoke();
         }
