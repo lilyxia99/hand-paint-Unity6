@@ -28,6 +28,11 @@ namespace FingerPaint
         {
             _saveDirectory = MeshExporter.GetExportDirectory();
             _manifestPath = Path.Combine(_saveDirectory, "gallery_manifest.json");
+
+            // Ensure the save folder exists from startup
+            if (!Directory.Exists(_saveDirectory))
+                Directory.CreateDirectory(_saveDirectory);
+
             LoadManifest();
         }
 

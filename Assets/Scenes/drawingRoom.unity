@@ -204,13 +204,13 @@ MonoBehaviour:
   _textScale: 0.004
   _leftLabel: Gallery
   _rightLabel: Clear
-  _font: {fileID: 0}
+  _font: {fileID: 11400000, guid: ef4f0b7f64e96994ba863a530ce59c6f, type: 2}
   _enableGlow: 1
-  _sdfGlowShader: {fileID: 0}
-  _glowColor: {r: 0.5, g: 0.8, b: 1, a: 0.5}
+  _sdfGlowShader: {fileID: 4800000, guid: 68e6db2ebdc24f95958faec2be5558d6, type: 3}
+  _glowColor: {r: 0.6860568, g: 0.56737274, b: 0.9622642, a: 0.5}
   _glowOffset: 0
-  _glowInner: 0.15
-  _glowOuter: 0.35
+  _glowInner: 0.205
+  _glowOuter: 0.432
   _glowPower: 0.6
 --- !u!114 &20724435
 MonoBehaviour:
@@ -624,7 +624,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::FingerPaint.GalleryUI
   _galleryManager: {fileID: 668022994}
-  _ringRadius: 0.5
+  _ringRadius: 1
   _heightOffset: -0.3
   _objectScale: 0.5
   _rotationSpeed: 20
@@ -633,10 +633,10 @@ MonoBehaviour:
   _font: {fileID: 11400000, guid: ef4f0b7f64e96994ba863a530ce59c6f, type: 2}
   _enableGlow: 1
   _sdfGlowShader: {fileID: 4800000, guid: 68e6db2ebdc24f95958faec2be5558d6, type: 3}
-  _glowColor: {r: 0.5, g: 0.8, b: 1, a: 0.5}
+  _glowColor: {r: 0.86499566, g: 0.7803044, b: 0.990566, a: 0.5}
   _glowOffset: 0
   _glowInner: 0.15
-  _glowOuter: 0.35
+  _glowOuter: 0.529
   _glowPower: 0.6
 --- !u!114 &668022994
 MonoBehaviour:

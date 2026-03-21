@@ -66,7 +66,7 @@
 				{
 					"directoryIndex" : 1,
 					"id" : "game::@d02bb112ea9f9c2ed29f",
-					"jsonFile" : "target-game-Debug-b7a4f13cc7bf35b223b6.json",
+					"jsonFile" : "target-game-Debug-a96c57102bef4e309775.json",
 					"name" : "game",
 					"projectIndex" : 1
 				}
@@ -77,7 +77,7 @@
 	"paths" : 
 	{
 		"build" : "C:/Users/l_xia/Documents/DEVELOPER/hand-paint/My project/.utmp/Debug/4m2e5k6r/arm64-v8a",
-		"source" : "C:/Users/l_xia/Documents/DEVELOPER/hand-paint/My project/Library/PramData/AndroidApplicationController/Cache/com.DefaultCompany.VRTemplate/gradle-project/unityLibrary/src/main/cpp"
+		"source" : "C:/Users/l_xia/Documents/DEVELOPER/hand-paint/My project/Library/Bee/Android/Prj/IL2CPP/Gradle/unityLibrary/src/main/cpp"
 	},
 	"version" : 
 	{

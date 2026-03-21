@@ -1,4 +1,4 @@
-                        -HC:\Users\l_xia\Documents\DEVELOPER\hand-paint\My project\Library\PramData\AndroidApplicationController\Cache\com.DefaultCompany.VRTemplate\gradle-project\unityLibrary\src\main\cpp
+                        -HC:\Users\l_xia\Documents\DEVELOPER\hand-paint\My project\Library\Bee\Android\Prj\IL2CPP\Gradle\unityLibrary\src\main\cpp
 -DCMAKE_SYSTEM_NAME=Android
 -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
 -DCMAKE_SYSTEM_VERSION=32
@@ -9,8 +9,8 @@
 -DCMAKE_ANDROID_NDK=C:\Program Files\Unity\Hub\Editor\6000.3.10f1\Editor\Data\PlaybackEngines\AndroidPlayer\NDK
 -DCMAKE_TOOLCHAIN_FILE=C:\Program Files\Unity\Hub\Editor\6000.3.10f1\Editor\Data\PlaybackEngines\AndroidPlayer\NDK\build\cmake\android.toolchain.cmake
 -DCMAKE_MAKE_PROGRAM=C:\Program Files\Unity\Hub\Editor\6000.3.10f1\Editor\Data\PlaybackEngines\AndroidPlayer\SDK\cmake\3.22.1\bin\ninja.exe
--DCMAKE_LIBRARY_OUTPUT_DIRECTORY=C:\Users\l_xia\Documents\DEVELOPER\hand-paint\My project\Library\PramData\AndroidApplicationController\Cache\com.DefaultCompany.VRTemplate\gradle-project\unityLibrary\build\intermediates\cxx\Debug\4m2e5k6r\obj\arm64-v8a
--DCMAKE_RUNTIME_OUTPUT_DIRECTORY=C:\Users\l_xia\Documents\DEVELOPER\hand-paint\My project\Library\PramData\AndroidApplicationController\Cache\com.DefaultCompany.VRTemplate\gradle-project\unityLibrary\build\intermediates\cxx\Debug\4m2e5k6r\obj\arm64-v8a
+-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=C:\Users\l_xia\Documents\DEVELOPER\hand-paint\My project\Library\Bee\Android\Prj\IL2CPP\Gradle\unityLibrary\build\intermediates\cxx\Debug\4m2e5k6r\obj\arm64-v8a
+-DCMAKE_RUNTIME_OUTPUT_DIRECTORY=C:\Users\l_xia\Documents\DEVELOPER\hand-paint\My project\Library\Bee\Android\Prj\IL2CPP\Gradle\unityLibrary\build\intermediates\cxx\Debug\4m2e5k6r\obj\arm64-v8a
 -DCMAKE_BUILD_TYPE=Debug
 -DCMAKE_FIND_ROOT_PATH=C:\Users\l_xia\Documents\DEVELOPER\hand-paint\My project\.utmp\Debug\4m2e5k6r\prefab\arm64-v8a\prefab
 -BC:\Users\l_xia\Documents\DEVELOPER\hand-paint\My project\.utmp\Debug\4m2e5k6r\arm64-v8a

@@ -739,7 +739,7 @@
 				}
 			],
 			"type" : "INTERNAL",
-			"value" : "C:/Users/l_xia/Documents/DEVELOPER/hand-paint/My project/Library/PramData/AndroidApplicationController/Cache/com.DefaultCompany.VRTemplate/gradle-project/unityLibrary/src/main/cpp"
+			"value" : "C:/Users/l_xia/Documents/DEVELOPER/hand-paint/My project/Library/Bee/Android/Prj/IL2CPP/Gradle/unityLibrary/src/main/cpp"
 		},
 		{
 			"name" : "CMAKE_INSTALL_PREFIX",
@@ -775,7 +775,7 @@
 				}
 			],
 			"type" : "UNINITIALIZED",
-			"value" : "C:\\Users\\l_xia\\Documents\\DEVELOPER\\hand-paint\\My project\\Library\\PramData\\AndroidApplicationController\\Cache\\com.DefaultCompany.VRTemplate\\gradle-project\\unityLibrary\\build\\intermediates\\cxx\\Debug\\4m2e5k6r\\obj\\arm64-v8a"
+			"value" : "C:\\Users\\l_xia\\Documents\\DEVELOPER\\hand-paint\\My project\\Library\\Bee\\Android\\Prj\\IL2CPP\\Gradle\\unityLibrary\\build\\intermediates\\cxx\\Debug\\4m2e5k6r\\obj\\arm64-v8a"
 		},
 		{
 			"name" : "CMAKE_LINKER",
@@ -1047,7 +1047,7 @@
 				}
 			],
 			"type" : "UNINITIALIZED",
-			"value" : "C:\\Users\\l_xia\\Documents\\DEVELOPER\\hand-paint\\My project\\Library\\PramData\\AndroidApplicationController\\Cache\\com.DefaultCompany.VRTemplate\\gradle-project\\unityLibrary\\build\\intermediates\\cxx\\Debug\\4m2e5k6r\\obj\\arm64-v8a"
+			"value" : "C:\\Users\\l_xia\\Documents\\DEVELOPER\\hand-paint\\My project\\Library\\Bee\\Android\\Prj\\IL2CPP\\Gradle\\unityLibrary\\build\\intermediates\\cxx\\Debug\\4m2e5k6r\\obj\\arm64-v8a"
 		},
 		{
 			"name" : "CMAKE_SHARED_LINKER_FLAGS",
@@ -1343,7 +1343,7 @@
 				}
 			],
 			"type" : "STATIC",
-			"value" : "C:/Users/l_xia/Documents/DEVELOPER/hand-paint/My project/Library/PramData/AndroidApplicationController/Cache/com.DefaultCompany.VRTemplate/gradle-project/unityLibrary/src/main/cpp"
+			"value" : "C:/Users/l_xia/Documents/DEVELOPER/hand-paint/My project/Library/Bee/Android/Prj/IL2CPP/Gradle/unityLibrary/src/main/cpp"
 		},
 		{
 			"name" : "game-activity_DIR",
@@ -1403,7 +1403,7 @@
 				}
 			],
 			"type" : "STATIC",
-			"value" : "C:/Users/l_xia/Documents/DEVELOPER/hand-paint/My project/Library/PramData/AndroidApplicationController/Cache/com.DefaultCompany.VRTemplate/gradle-project/unityLibrary/src/main/cpp/GameActivity"
+			"value" : "C:/Users/l_xia/Documents/DEVELOPER/hand-paint/My project/Library/Bee/Android/Prj/IL2CPP/Gradle/unityLibrary/src/main/cpp/GameActivity"
 		}
 	],
 	"kind" : "cache",

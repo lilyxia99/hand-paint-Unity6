@@ -1,7 +1,7 @@
 {
   "buildFiles": [
-    "C:\\Users\\l_xia\\Documents\\DEVELOPER\\hand-paint\\My project\\Library\\PramData\\AndroidApplicationController\\Cache\\com.DefaultCompany.VRTemplate\\gradle-project\\unityLibrary\\src\\main\\cpp\\CMakeLists.txt",
-    "C:\\Users\\l_xia\\Documents\\DEVELOPER\\hand-paint\\My project\\Library\\PramData\\AndroidApplicationController\\Cache\\com.DefaultCompany.VRTemplate\\gradle-project\\unityLibrary\\src\\main\\cpp\\GameActivity\\CMakeLists.txt"
+    "C:\\Users\\l_xia\\Documents\\DEVELOPER\\hand-paint\\My project\\Library\\Bee\\Android\\Prj\\IL2CPP\\Gradle\\unityLibrary\\src\\main\\cpp\\CMakeLists.txt",
+    "C:\\Users\\l_xia\\Documents\\DEVELOPER\\hand-paint\\My project\\Library\\Bee\\Android\\Prj\\IL2CPP\\Gradle\\unityLibrary\\src\\main\\cpp\\GameActivity\\CMakeLists.txt"
   ],
   "cleanCommandsComponents": [
     [
@@ -21,7 +21,7 @@
     "game::@d02bb112ea9f9c2ed29f": {
       "artifactName": "game",
       "abi": "arm64-v8a",
-      "output": "C:\\Users\\l_xia\\Documents\\DEVELOPER\\hand-paint\\My project\\Library\\PramData\\AndroidApplicationController\\Cache\\com.DefaultCompany.VRTemplate\\gradle-project\\unityLibrary\\build\\intermediates\\cxx\\Debug\\4m2e5k6r\\obj\\arm64-v8a\\libgame.so",
+      "output": "C:\\Users\\l_xia\\Documents\\DEVELOPER\\hand-paint\\My project\\Library\\Bee\\Android\\Prj\\IL2CPP\\Gradle\\unityLibrary\\build\\intermediates\\cxx\\Debug\\4m2e5k6r\\obj\\arm64-v8a\\libgame.so",
       "runtimeFiles": []
     }
   }
