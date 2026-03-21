@@ -14,11 +14,11 @@ namespace FingerPaint
         [SerializeField] private HandTrackingManager _handTracking;
 
         [Header("Gaze Detection")]
-        [Tooltip("Min dot(cameraForward, toPalm) to count as 'looking at palm'. 0.55 ≈ 56° cone.")]
-        [SerializeField] private float _gazeDotThreshold = 0.55f;
+        [Tooltip("Min dot(cameraForward, toPalm) to count as 'looking at palm'. 0.45 ≈ 63° cone.")]
+        [SerializeField] private float _gazeDotThreshold = 0.45f;
 
-        [Tooltip("Min dot(palmNormal, toCamera) to count as 'palm facing camera'.")]
-        [SerializeField] private float _palmFacingDotThreshold = 0.2f;
+        [Tooltip("Min dot(palmNormal, toCamera) to count as 'palm facing camera'. Set very low to accept any palm angle.")]
+        [SerializeField] private float _palmFacingDotThreshold = -0.1f;
 
         [Header("Appearance")]
         [Tooltip("Offset above the palm center in palm-normal direction (meters).")]

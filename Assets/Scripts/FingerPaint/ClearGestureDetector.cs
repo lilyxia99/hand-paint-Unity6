@@ -5,7 +5,7 @@ namespace FingerPaint
     /// <summary>
     /// Detects a "clear canvas" gesture: thumb tip + middle finger tip pinch together
     /// with the palm facing toward the user. Shows a confirmation panel; thumbs-up
-    /// (both hands) confirms the clear, or it auto-cancels after a timeout.
+    /// (either hand) confirms the clear, or it auto-cancels after a timeout.
     /// </summary>
     public class ClearGestureDetector : MonoBehaviour
     {
@@ -121,11 +121,11 @@ namespace FingerPaint
                 return;
             }
 
-            // Check for thumbs-up (both hands) to confirm
-            bool bothThumbsUp = _handTracking.IsThumbsUp(true)
-                             && _handTracking.IsThumbsUp(false);
+            // Check for thumbs-up (either hand) to confirm
+            bool eitherThumbsUp = _handTracking.IsThumbsUp(true)
+                              || _handTracking.IsThumbsUp(false);
 
-            if (bothThumbsUp)
+            if (eitherThumbsUp)
             {
                 Debug.Log("[ClearGesture] Confirmed — clearing canvas.");
                 ExecuteClear();

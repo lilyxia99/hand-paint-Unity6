@@ -680,10 +680,10 @@ MonoBehaviour:
   _displayDuration: 2
   _distance: 0.5
   _verticalOffset: 0.05
-  _font: {fileID: 0}
+  _font: {fileID: 11400000, guid: ef4f0b7f64e96994ba863a530ce59c6f, type: 2}
   _baseColor: {r: 0.5, g: 1, b: 0.6, a: 1}
   _enableGlow: 1
-  _sdfGlowShader: {fileID: 0}
+  _sdfGlowShader: {fileID: 4800000, guid: 68e6db2ebdc24f95958faec2be5558d6, type: 3}
   _glowColor: {r: 0.5, g: 1, b: 0.6, a: 0.5}
   _glowOffset: 0
   _glowInner: 0.15

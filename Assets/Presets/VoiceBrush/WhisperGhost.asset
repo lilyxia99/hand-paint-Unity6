@@ -14,26 +14,26 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::FingerPaint.VoiceBrushProfile
   BaseColor: {r: 0.7, g: 0.8, b: 1, a: 1}
   BaseEmissionColor: {r: 0.5, g: 0.6, b: 1, a: 1}
-  BaseEmissionIntensity: 0.15
+  BaseEmissionIntensity: 0.08
   BaseOpacity: 0.024
-  BaseSizeMultiplier: 0.8
+  BaseSizeMultiplier: 2.03
   BaseMeshIndex: 0
   BaseFresnelScale: 1.2
   Mappings:
   - Source: 0
-    Target: 4
+    Target: 5
     ResponseCurve:
       serializedVersion: 2
       m_Curve:
       - serializedVersion: 3
         time: 0
         value: 0
-        inSlope: 0
-        outSlope: 0
+        inSlope: 2.9841268
+        outSlope: 2.9841268
         tangentMode: 0
         weightedMode: 0
         inWeight: 0
-        outWeight: 0
+        outWeight: 0.0375
       - serializedVersion: 3
         time: 1
         value: 1
@@ -57,8 +57,8 @@ MonoBehaviour:
       - serializedVersion: 3
         time: 0
         value: 0
-        inSlope: 0
-        outSlope: 1
+        inSlope: 2
+        outSlope: 2
         tangentMode: 0
         weightedMode: 0
         inWeight: 0
@@ -66,7 +66,7 @@ MonoBehaviour:
       - serializedVersion: 3
         time: 1
         value: 1
-        inSlope: 1
+        inSlope: 0
         outSlope: 0
         tangentMode: 0
         weightedMode: 0
@@ -79,15 +79,15 @@ MonoBehaviour:
     OutputMax: 0.6
     Influence: 0.8
   - Source: 1
-    Target: 5
+    Target: 4
     ResponseCurve:
       serializedVersion: 2
       m_Curve:
       - serializedVersion: 3
         time: 0
         value: 0
-        inSlope: 0
-        outSlope: 1
+        inSlope: 2
+        outSlope: 2
         tangentMode: 0
         weightedMode: 0
         inWeight: 0
@@ -95,7 +95,7 @@ MonoBehaviour:
       - serializedVersion: 3
         time: 1
         value: 1
-        inSlope: 1
+        inSlope: 0
         outSlope: 0
         tangentMode: 0
         weightedMode: 0
