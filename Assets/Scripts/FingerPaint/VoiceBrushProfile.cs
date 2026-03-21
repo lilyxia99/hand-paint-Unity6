@@ -35,6 +35,10 @@ namespace FingerPaint
         [Range(0f, 2f)]
         public float BaseFresnelScale = 0.8f;
 
+        [Header("Blend Mode")]
+        [Tooltip("Alpha = standard transparency. Additive = overlapping spheres brighten each other.")]
+        public PaintBlendMode BlendMode = PaintBlendMode.Additive;
+
         [Header("Voice-to-Visual Mappings")]
         [Tooltip("Each entry maps a voice analysis channel to a visual target.")]
         public VoiceMapping[] Mappings = new VoiceMapping[0];

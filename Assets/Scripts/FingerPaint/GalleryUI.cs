@@ -344,12 +344,20 @@ namespace FingerPaint
             float hue = (float)index / Mathf.Max(1, total);
             Color color = Color.HSVToRGB(hue, 0.5f, 0.9f);
 
-            var shader = Shader.Find("Universal Render Pipeline/Lit")
+            // Use the same PaintBall Transparent shader as painting spheres
+            var shader = Shader.Find("FingerPaint/PaintBall Transparent")
+                      ?? Shader.Find("Universal Render Pipeline/Lit")
                       ?? Shader.Find("Standard");
             var mat = new Material(shader);
-            mat.color = color;
-            mat.EnableKeyword("_EMISSION");
-            mat.SetColor("_EmissionColor", color * 0.2f);
+            mat.SetColor("_BaseColor", color);
+            mat.SetFloat("_Opacity", 0.45f);
+            mat.SetFloat("_EnableEmission", 1f);
+            mat.SetColor("_EmissionColor", color);
+            mat.SetFloat("_EmissionIntensity", 0.2f);
+            mat.SetFloat("_EnableFresnel", 1f);
+            mat.SetColor("_FresnelColor", Color.white);
+            mat.SetFloat("_FresnelPower", 2.5f);
+            mat.SetFloat("_FresnelScale", 0.5f);
             return mat;
         }
 

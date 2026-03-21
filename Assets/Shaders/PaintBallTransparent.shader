@@ -6,6 +6,9 @@ Shader "FingerPaint/PaintBall Transparent"
         _BaseColor ("Base Color", Color) = (1, 0.4, 0.2, 0.5)
         _Opacity   ("Opacity",   Range(0, 1)) = 0.5
 
+        [Header(Blend Mode)]
+        [KeywordEnum(Alpha, Additive)] _BlendMode ("Blend Mode", Float) = 0
+
         [Header(Fresnel Rim)]
         [Toggle] _EnableFresnel ("Enable Fresnel Rim", Float) = 1
         _FresnelColor  ("Fresnel Color",    Color) = (1, 1, 1, 1)
@@ -16,6 +19,10 @@ Shader "FingerPaint/PaintBall Transparent"
         [Toggle] _EnableEmission ("Enable Emission", Float) = 1
         _EmissionColor    ("Emission Color",    Color) = (1, 0.4, 0.2, 1)
         _EmissionIntensity ("Emission Intensity", Range(0, 3)) = 0.3
+
+        // Hidden blend factor properties driven by _BlendMode keyword
+        [HideInInspector] _SrcBlend ("Src Blend", Float) = 5   // SrcAlpha
+        [HideInInspector] _DstBlend ("Dst Blend", Float) = 10  // OneMinusSrcAlpha
     }
 
     SubShader
@@ -32,13 +39,15 @@ Shader "FingerPaint/PaintBall Transparent"
             Name "ForwardLit"
             Tags { "LightMode" = "UniversalForward" }
 
-            Blend SrcAlpha OneMinusSrcAlpha
+            Blend [_SrcBlend] [_DstBlend]
             ZWrite Off
             Cull Back
 
             HLSLPROGRAM
             #pragma vertex vert
             #pragma fragment frag
+
+            #pragma multi_compile _ _BLENDMODE_ADDITIVE
 
             // URP core includes
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
@@ -96,7 +105,7 @@ Shader "FingerPaint/PaintBall Transparent"
                 Light mainLight = GetMainLight();
                 half  NdotL     = saturate(dot(N, mainLight.direction));
                 half3 diffuse   = _BaseColor.rgb * mainLight.color * (NdotL * 0.6 + 0.4);
-                // ↑ wrap-lighting: 60 % Lambert + 40 % ambient fill
+                // wrap-lighting: 60 % Lambert + 40 % ambient fill
 
                 // --- Fresnel rim (makes edges of the sphere glow) ---
                 half3 fresnel = half3(0, 0, 0);
@@ -115,6 +124,13 @@ Shader "FingerPaint/PaintBall Transparent"
 
                 half3 finalColor = diffuse + fresnel + emission;
                 half  finalAlpha = _Opacity;
+
+                #ifdef _BLENDMODE_ADDITIVE
+                    // Additive: multiply color by opacity so it fades correctly,
+                    // then alpha=1 (dst blend is One, so alpha is irrelevant
+                    // but we premultiply for consistent brightness control)
+                    finalColor *= finalAlpha;
+                #endif
 
                 return half4(finalColor, finalAlpha);
             }
@@ -162,5 +178,6 @@ Shader "FingerPaint/PaintBall Transparent"
         }
     }
 
+    CustomEditor "PaintBallShaderGUI"
     FallBack "Universal Render Pipeline/Lit"
 }

@@ -16,9 +16,10 @@ MonoBehaviour:
   BaseEmissionColor: {r: 0.5, g: 0.6, b: 1, a: 1}
   BaseEmissionIntensity: 0.08
   BaseOpacity: 0.024
-  BaseSizeMultiplier: 2.03
+  BaseSizeMultiplier: 1
   BaseMeshIndex: 0
   BaseFresnelScale: 1.2
+  BlendMode: 0
   Mappings:
   - Source: 0
     Target: 5
@@ -46,8 +47,8 @@ MonoBehaviour:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    OutputMin: 0.05
-    OutputMax: 0.7
+    OutputMin: 1
+    OutputMax: 5
     Influence: 1
   - Source: 3
     Target: 1
@@ -86,8 +87,8 @@ MonoBehaviour:
       - serializedVersion: 3
         time: 0
         value: 0
-        inSlope: 2
-        outSlope: 2
+        inSlope: 0
+        outSlope: 0
         tangentMode: 0
         weightedMode: 0
         inWeight: 0
@@ -104,8 +105,8 @@ MonoBehaviour:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    OutputMin: 1.2
-    OutputMax: 0.4
+    OutputMin: 0.05
+    OutputMax: 1
     Influence: 0.9
   - Source: 1
     Target: 0
@@ -135,5 +136,5 @@ MonoBehaviour:
       m_RotationOrder: 4
     OutputMin: 0.55
     OutputMax: 0.75
-    Influence: 0.6
+    Influence: 1
   OutputSmoothing: 0.15

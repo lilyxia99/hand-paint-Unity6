@@ -22,6 +22,17 @@ namespace FingerPaint
     }
 
     /// <summary>
+    /// Blend mode for paint spheres.
+    /// </summary>
+    public enum PaintBlendMode
+    {
+        /// <summary>Standard alpha transparency.</summary>
+        Alpha = 0,
+        /// <summary>Additive: overlapping areas brighten.</summary>
+        Additive = 1
+    }
+
+    /// <summary>
     /// Visual properties that can be driven by voice.
     /// </summary>
     public enum VisualTarget
@@ -118,6 +129,7 @@ namespace FingerPaint
         public float SizeMultiplier;
         public int   MeshIndex;
         public float FresnelScale;
+        public PaintBlendMode BlendMode;
         /// <summary>False when voice brush is inactive or unconfigured.</summary>
         public bool  IsValid;
     }

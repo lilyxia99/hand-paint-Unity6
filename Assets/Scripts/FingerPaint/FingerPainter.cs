@@ -117,6 +117,7 @@ namespace FingerPaint
 
         private Vector3[] _lastSpawnPos;
         private Material[] _fingerMaterials;
+        private Material[] _fingerMaterialsAdditive; // additive variants for blend mode switching
         private Mesh _sharedSphereMesh;
 
         // ─── Idle trail fade state ───────────────────────────────────────
@@ -339,7 +340,12 @@ namespace FingerPaint
             }
 
             var mr = go.AddComponent<MeshRenderer>();
-            mr.sharedMaterial = _fingerMaterials[fingerIndex];
+
+            // Pick material: additive variant if voice brush requests it
+            if (useVoiceBrush && brush.BlendMode == PaintBlendMode.Additive)
+                mr.sharedMaterial = _fingerMaterialsAdditive[fingerIndex];
+            else
+                mr.sharedMaterial = _fingerMaterials[fingerIndex];
 
             // Per-instance MaterialPropertyBlock overrides (no new Material alloc)
             if (useVoiceBrush)
@@ -773,6 +779,7 @@ namespace FingerPaint
         private void BuildMaterials()
         {
             _fingerMaterials = new Material[HandTrackingManager.FingerCount];
+            _fingerMaterialsAdditive = new Material[HandTrackingManager.FingerCount];
 
             // Use URP Lit shader if available, otherwise fallback
             var shader = Shader.Find("Universal Render Pipeline/Lit")
@@ -800,7 +807,20 @@ namespace FingerPaint
                     mat.SetColor("_EmissionColor", _fingerColors[i] * 0.3f);
                     _fingerMaterials[i] = mat;
                 }
+
+                // Create additive variant by cloning the alpha material
+                _fingerMaterialsAdditive[i] = new Material(_fingerMaterials[i]);
+                SetMaterialAdditive(_fingerMaterialsAdditive[i]);
             }
+        }
+
+        private static void SetMaterialAdditive(Material mat)
+        {
+            mat.SetFloat("_BlendMode", 1f);
+            mat.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.One);
+            mat.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.One);
+            mat.EnableKeyword("_BLENDMODE_ADDITIVE");
+            mat.DisableKeyword("_BLENDMODE_ALPHA");
         }
     }
 }

@@ -196,6 +196,7 @@ namespace FingerPaint
                 SizeMultiplier    = _sSize,
                 MeshIndex         = Mathf.RoundToInt(_sMeshIdx),
                 FresnelScale      = _sFresnel,
+                BlendMode         = _activeProfile.BlendMode,
                 IsValid           = features.IsActive
             };
         }

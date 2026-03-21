@@ -965,7 +965,7 @@ MonoBehaviour:
     m_PostInfinity: 2
     m_RotationOrder: 4
   _tempBallColor: {r: 0.6, g: 0.6, b: 0.8, a: 1}
-  _tempBallOpacity: 0.25
+  _tempBallOpacity: 0.076
   _idleFadeDelay: 1
   _idleFadeCount: 5
   _trailFadeDuration: 1.5
