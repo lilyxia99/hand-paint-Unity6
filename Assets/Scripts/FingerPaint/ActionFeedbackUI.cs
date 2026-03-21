@@ -1,3 +1,4 @@
+using TMPro;
 using UnityEngine;
 
 namespace FingerPaint
@@ -5,7 +6,7 @@ namespace FingerPaint
     /// <summary>
     /// Reusable world-space popup that shows a brief feedback message
     /// (e.g. "Saved!", "Cleared!") and auto-dismisses.
-    /// Multi-layer glow text — no black background.
+    /// Uses TextMeshPro with optional SDF glow.
     /// </summary>
     public class ActionFeedbackUI : MonoBehaviour
     {
@@ -14,12 +15,29 @@ namespace FingerPaint
         [SerializeField] private float _distance = 0.5f;
         [SerializeField] private float _verticalOffset = 0.05f;
 
-        private static readonly Color _baseColor = new Color(0.5f, 1f, 0.6f);
+        [Header("Text")]
+        [Tooltip("Optional TMP font asset. Leave empty for the default TMP font.")]
+        [SerializeField] private TMP_FontAsset _font;
+
+        [SerializeField] private Color _baseColor = new Color(0.5f, 1f, 0.6f);
+
+        [Header("Glow (TMP Shader)")]
+        [Tooltip("Enable the TMP SDF shader glow effect.")]
+        [SerializeField] private bool _enableGlow = true;
+
+        [Tooltip("Drag TMP_SDF.shader here (Assets/TextMesh Pro/Shaders/TMP_SDF.shader).")]
+        [SerializeField] private Shader _sdfGlowShader;
+
+        [SerializeField] private Color _glowColor = new Color(0.5f, 1f, 0.6f, 0.5f);
+        [SerializeField] [Range(-1f, 1f)] private float _glowOffset = 0f;
+        [SerializeField] [Range(0f, 1f)] private float _glowInner = 0.15f;
+        [SerializeField] [Range(0f, 1f)] private float _glowOuter = 0.35f;
+        [SerializeField] [Range(0f, 1f)] private float _glowPower = 0.6f;
 
         // ─── Runtime ────────────────────────────────────────────────────
         private Transform _root;
-        private TextMesh _messageText;
-        private TextMesh[] _glows;
+        private TextMeshPro _messageTMP;
+        private TMPTextFactory.Result _textResult;
         private Camera _cam;
         private bool _isBuilt;
         private float _showTimer;
@@ -34,10 +52,8 @@ namespace FingerPaint
             if (!_isBuilt)
                 BuildPanel();
 
-            _messageText.text = message;
-            TextGlowHelper.SetText(_glows, message);
-            _messageText.color = _baseColor;
-            TextGlowHelper.SetColor(_glows, _baseColor);
+            _messageTMP.text = message;
+            _messageTMP.color = _baseColor;
             _showTimer = 0f;
             _root.gameObject.SetActive(true);
 
@@ -96,8 +112,15 @@ namespace FingerPaint
             else if (_showTimer > fadeStart)
             {
                 float alpha = 1f - (_showTimer - fadeStart) / 0.5f;
-                _messageText.color = new Color(_baseColor.r, _baseColor.g, _baseColor.b, alpha);
-                TextGlowHelper.SetAlphaMultiplier(_glows, _baseColor, alpha);
+                _messageTMP.color = new Color(_baseColor.r, _baseColor.g, _baseColor.b, alpha);
+
+                // Fade glow alpha too
+                if (_enableGlow && _textResult.MaterialInstance != null)
+                {
+                    Color gc = _glowColor;
+                    gc.a = _glowColor.a * alpha;
+                    TMPTextFactory.SetGlowColor(_textResult.MaterialInstance, gc);
+                }
             }
         }
 
@@ -108,23 +131,35 @@ namespace FingerPaint
             _root = new GameObject("ActionFeedbackPanel").transform;
             _root.SetParent(transform, false);
 
-            // Main text
-            var textGO = new GameObject("FeedbackText");
-            textGO.transform.SetParent(_root, false);
-            _messageText = textGO.AddComponent<TextMesh>();
-            _messageText.fontSize = 42;
-            _messageText.characterSize = 0.006f;
-            _messageText.anchor = TextAnchor.MiddleCenter;
-            _messageText.alignment = TextAlignment.Center;
-            _messageText.color = _baseColor;
-            _messageText.text = "";
-            textGO.transform.localPosition = Vector3.zero;
+            var cfg = TMPTextFactory.Config.Default;
+            cfg.Name = "FeedbackText";
+            cfg.Parent = _root;
+            cfg.FontSize = 42f;
+            cfg.Color = _baseColor;
+            cfg.LocalScale = 0.006f;
+            cfg.RectSize = new Vector2(400f, 80f);
+            cfg.Font = _font;
+            cfg.GlowShader = _sdfGlowShader;
+            cfg.EnableGlow = _enableGlow;
+            cfg.Glow = GetGlowSettings();
 
-            // Multi-layer glow
-            _glows = TextGlowHelper.AddGlow(_root, _messageText, _baseColor);
+            _textResult = TMPTextFactory.Create(cfg);
+            _messageTMP = _textResult.TMP;
 
             _root.gameObject.SetActive(false);
             _isBuilt = true;
+        }
+
+        private TMPTextFactory.GlowSettings GetGlowSettings()
+        {
+            return new TMPTextFactory.GlowSettings
+            {
+                Color = _glowColor,
+                Offset = _glowOffset,
+                Inner = _glowInner,
+                Outer = _glowOuter,
+                Power = _glowPower,
+            };
         }
     }
 }

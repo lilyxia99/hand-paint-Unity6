@@ -35,8 +35,8 @@ MonoBehaviour:
     - line: '|   targetDevice: 2'
     - line: '|   useOnDemandResources: 0'
     - line: '|   accelerometerFrequency: 60'
-    - line: '|   companyName: DefaultCompany'
-    - line: '|   productName: My project'
+    - line: '|   companyName: Leilei Xia'
+    - line: '|   productName: Empty Touch'
     - line: '|   defaultCursor: {instanceID: 0}'
     - line: '|   cursorHotspot: {x: 0, y: 0}'
     - line: '|   m_SplashScreenBackgroundColor: {r: 0.13725491, g: 0.12156863, b:
@@ -171,6 +171,12 @@ MonoBehaviour:
     - line: '|   preloadedAssets:'
     - line: '|   - {fileID: 11400000, guid: d232a279f47394c44aff95b839f7c88e, type:
         2}'
+    - line: '|   - {fileID: 11400000, guid: 908d62378b8205449861e5838a18a596, type:
+        2}'
+    - line: '|   - {fileID: 4226981303226134123, guid: b716680a41c7a094fa3b7fb9a8024a67,
+        type: 2}'
+    - line: '|   - {fileID: 9030113687040111788, guid: 4b3de149e50ea0c4f8ad04c79b9f12ec,
+        type: 2}'
     - line: '|   metroInputSource: 0'
     - line: '|   wsaTransparentSwapchain: 0'
     - line: '|   m_HolographicPauseOnTrackingLoss: 1'
@@ -1077,7 +1083,7 @@ MonoBehaviour:
         m_ExportAsGoogleAndroidProject: 0
         m_DebugSymbolLevel: 4
         m_DebugSymbolFormat: 5
-        m_CurrentDeploymentTargetId: 2G97C5ZH9201D3
+        m_CurrentDeploymentTargetId: __builtin__target_default
         m_BuildType: 1
         m_LinkTimeOptimization: 1
         m_BuildAppBundle: 0

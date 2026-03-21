@@ -4,7 +4,7 @@ using UnityEngine;
 namespace FingerPaint
 {
     /// <summary>
-    /// World-space subtitle display for VR — uses TextMeshPro with optional shader glow.
+    /// World-space subtitle display for VR — uses TextMeshPro with optional SDF glow.
     /// Floats in front of the player's head so it's always visible on Quest.
     /// </summary>
     public class SubtitleDisplay : MonoBehaviour
@@ -36,38 +36,22 @@ namespace FingerPaint
         [Tooltip("Enable the TMP SDF shader glow effect.")]
         [SerializeField] private bool _enableGlow = true;
 
-        [Tooltip("Drag the 'TextMeshPro/Distance Field' shader here (Assets/TextMesh Pro/Shaders/TMP_SDF.shader). Required for glow to work.")]
+        [Tooltip("Drag TMP_SDF.shader here (Assets/TextMesh Pro/Shaders/TMP_SDF.shader).")]
         [SerializeField] private Shader _sdfGlowShader;
 
-        [Tooltip("Glow color.")]
         [SerializeField] private Color _glowColor = new Color(0.5f, 0.8f, 1f, 0.5f);
-
-        [Tooltip("Glow offset along the SDF. Negative = inside, positive = outside.")]
         [SerializeField] [Range(-1f, 1f)] private float _glowOffset = 0f;
-
-        [Tooltip("Inner softness of the glow.")]
         [SerializeField] [Range(0f, 1f)] private float _glowInner = 0.15f;
-
-        [Tooltip("Outer softness of the glow.")]
         [SerializeField] [Range(0f, 1f)] private float _glowOuter = 0.35f;
-
-        [Tooltip("Falloff power of the glow (lower = softer).")]
         [SerializeField] [Range(0f, 1f)] private float _glowPower = 0.6f;
 
         // ─── Runtime ────────────────────────────────────────────────────
         private Transform _root;
         private TextMeshPro _tmp;
-        private Material _matInstance;
+        private TMPTextFactory.Result _textResult;
         private Camera _cam;
         private string _currentText;
         private bool _glowStateCached;
-
-        // ─── Shader property IDs ────────────────────────────────────────
-        private static readonly int ID_GlowColor  = Shader.PropertyToID("_GlowColor");
-        private static readonly int ID_GlowOffset = Shader.PropertyToID("_GlowOffset");
-        private static readonly int ID_GlowInner  = Shader.PropertyToID("_GlowInner");
-        private static readonly int ID_GlowOuter  = Shader.PropertyToID("_GlowOuter");
-        private static readonly int ID_GlowPower  = Shader.PropertyToID("_GlowPower");
 
         // ─── Public API ─────────────────────────────────────────────────
 
@@ -156,35 +140,21 @@ namespace FingerPaint
             _root = new GameObject("SubtitlePanel").transform;
             _root.SetParent(transform, false);
 
-            // TextMeshPro (world-space 3D text)
-            var textGO = new GameObject("SubtitleText");
-            textGO.transform.SetParent(_root, false);
-            _tmp = textGO.AddComponent<TextMeshPro>();
+            var cfg = TMPTextFactory.Config.Default;
+            cfg.Name = "SubtitleText";
+            cfg.Parent = _root;
+            cfg.FontSize = _fontSize;
+            cfg.Color = _textColor;
+            cfg.LocalScale = 0.01f;
+            cfg.RectSize = new Vector2(400f, 100f);
+            cfg.Font = _font;
+            cfg.GlowShader = _sdfGlowShader;
+            cfg.EnableGlow = _enableGlow;
+            cfg.Glow = GetGlowSettings();
 
-            // Apply custom font if assigned
-            if (_font != null)
-                _tmp.font = _font;
-
-            _tmp.fontSize = _fontSize;
-            _tmp.color = _textColor;
-            _tmp.alignment = TextAlignmentOptions.Center;
-            _tmp.enableWordWrapping = true;
-
-            // Scale down — TMP world space is 1 unit = 1 metre; 0.01 brings it
-            // to a readable subtitle size at ~1.5 m viewing distance.
-            textGO.transform.localScale = Vector3.one * 0.01f;
-
-            var rect = _tmp.rectTransform;
-            rect.sizeDelta = new Vector2(400f, 100f); // large in local units, tiny after scale
-            rect.localPosition = Vector3.zero;
-
-            _tmp.text = "";
-
-            // Create a material instance so glow changes don't affect other TMP objects
-            _matInstance = new Material(_tmp.fontSharedMaterial);
-            _tmp.fontMaterial = _matInstance;
-
-            ApplyGlow();
+            _textResult = TMPTextFactory.Create(cfg);
+            _tmp = _textResult.TMP;
+            _glowStateCached = _enableGlow;
 
             // Start hidden
             _root.gameObject.SetActive(false);
@@ -203,23 +173,19 @@ namespace FingerPaint
         private void ApplyGlow()
         {
             _glowStateCached = _enableGlow;
-            if (_matInstance == null) return;
+            TMPTextFactory.ApplyGlow(_textResult, _sdfGlowShader, _enableGlow, GetGlowSettings());
+        }
 
-            if (_enableGlow && _sdfGlowShader != null)
+        private TMPTextFactory.GlowSettings GetGlowSettings()
+        {
+            return new TMPTextFactory.GlowSettings
             {
-                // Swap to the full SDF shader which supports GLOW_ON
-                _matInstance.shader = _sdfGlowShader;
-                _matInstance.EnableKeyword("GLOW_ON");
-                _matInstance.SetColor(ID_GlowColor,  _glowColor);
-                _matInstance.SetFloat(ID_GlowOffset, _glowOffset);
-                _matInstance.SetFloat(ID_GlowInner,  _glowInner);
-                _matInstance.SetFloat(ID_GlowOuter,  _glowOuter);
-                _matInstance.SetFloat(ID_GlowPower,  _glowPower);
-            }
-            else
-            {
-                _matInstance.DisableKeyword("GLOW_ON");
-            }
+                Color = _glowColor,
+                Offset = _glowOffset,
+                Inner = _glowInner,
+                Outer = _glowOuter,
+                Power = _glowPower,
+            };
         }
     }
 }

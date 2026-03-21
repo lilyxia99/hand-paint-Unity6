@@ -1,3 +1,4 @@
+using TMPro;
 using UnityEngine;
 
 namespace FingerPaint
@@ -5,7 +6,7 @@ namespace FingerPaint
     /// <summary>
     /// World-space confirmation panel that appears when the clear gesture is triggered.
     /// Shows "Really cleaning?" with a countdown timer bar.
-    /// Multi-layer glow text — no black backgrounds.
+    /// Uses TextMeshPro with optional SDF glow.
     /// </summary>
     public class ClearConfirmationUI : MonoBehaviour
     {
@@ -13,6 +14,23 @@ namespace FingerPaint
         [SerializeField] private float _panelWidth = 0.35f;
         [SerializeField] private float _distance = 0.5f;
         [SerializeField] private float _verticalOffset = 0.05f;
+
+        [Header("Text")]
+        [Tooltip("Optional TMP font asset. Leave empty for the default TMP font.")]
+        [SerializeField] private TMP_FontAsset _font;
+
+        [Header("Glow (TMP Shader)")]
+        [Tooltip("Enable the TMP SDF shader glow effect.")]
+        [SerializeField] private bool _enableGlow = true;
+
+        [Tooltip("Drag TMP_SDF.shader here (Assets/TextMesh Pro/Shaders/TMP_SDF.shader).")]
+        [SerializeField] private Shader _sdfGlowShader;
+
+        [SerializeField] private Color _glowColor = new Color(1f, 0.85f, 0.7f, 0.5f);
+        [SerializeField] [Range(-1f, 1f)] private float _glowOffset = 0f;
+        [SerializeField] [Range(0f, 1f)] private float _glowInner = 0.15f;
+        [SerializeField] [Range(0f, 1f)] private float _glowOuter = 0.35f;
+        [SerializeField] [Range(0f, 1f)] private float _glowPower = 0.6f;
 
         // ─── Public state ───────────────────────────────────────────────
 
@@ -25,8 +43,8 @@ namespace FingerPaint
         // ─── Private state ──────────────────────────────────────────────
 
         private Transform _root;
-        private TextMesh _messageText;
-        private TextMesh _instructionText;
+        private TextMeshPro _messageTMP;
+        private TextMeshPro _instructionTMP;
         private Transform _timerBarFill;
         private Material _timerBarMat;
         private Camera _mainCam;
@@ -144,34 +162,42 @@ namespace FingerPaint
             _root.SetParent(transform, false);
 
             // Message text
-            var msgGO = new GameObject("MessageText");
-            msgGO.transform.SetParent(_root, false);
-            _messageText = msgGO.AddComponent<TextMesh>();
-            _messageText.fontSize = 42;
-            _messageText.characterSize = 0.006f;
-            _messageText.anchor = TextAnchor.MiddleCenter;
-            _messageText.alignment = TextAlignment.Center;
-            _messageText.color = ColorMessage;
-            _messageText.text = "Really cleaning?";
-            msgGO.transform.localPosition = new Vector3(0f, 0.025f, 0f);
+            var msgCfg = TMPTextFactory.Config.Default;
+            msgCfg.Name = "MessageText";
+            msgCfg.Parent = _root;
+            msgCfg.FontSize = 42f;
+            msgCfg.Color = ColorMessage;
+            msgCfg.LocalScale = 0.006f;
+            msgCfg.LocalPosition = new Vector3(0f, 0.025f, 0f);
+            msgCfg.RectSize = new Vector2(400f, 60f);
+            msgCfg.Font = _font;
+            msgCfg.GlowShader = _sdfGlowShader;
+            msgCfg.EnableGlow = _enableGlow;
+            msgCfg.Glow = GetGlowSettings();
+            msgCfg.Glow.Color = new Color(ColorMessage.r, ColorMessage.g, ColorMessage.b, 0.5f);
 
-            // Message glow
-            TextGlowHelper.AddGlow(_root, _messageText, ColorMessage);
+            var msgResult = TMPTextFactory.Create(msgCfg);
+            _messageTMP = msgResult.TMP;
+            _messageTMP.text = "Really cleaning?";
 
             // Instruction text
-            var instGO = new GameObject("InstructionText");
-            instGO.transform.SetParent(_root, false);
-            _instructionText = instGO.AddComponent<TextMesh>();
-            _instructionText.fontSize = 30;
-            _instructionText.characterSize = 0.005f;
-            _instructionText.anchor = TextAnchor.MiddleCenter;
-            _instructionText.alignment = TextAlignment.Center;
-            _instructionText.color = ColorInstruction;
-            _instructionText.text = "Thumbs up = YES    Wait = Cancel";
-            instGO.transform.localPosition = new Vector3(0f, 0.002f, 0f);
+            var instCfg = TMPTextFactory.Config.Default;
+            instCfg.Name = "InstructionText";
+            instCfg.Parent = _root;
+            instCfg.FontSize = 30f;
+            instCfg.Color = ColorInstruction;
+            instCfg.LocalScale = 0.005f;
+            instCfg.LocalPosition = new Vector3(0f, 0.002f, 0f);
+            instCfg.RectSize = new Vector2(500f, 50f);
+            instCfg.Font = _font;
+            instCfg.GlowShader = _sdfGlowShader;
+            instCfg.EnableGlow = _enableGlow;
+            instCfg.Glow = GetGlowSettings();
+            instCfg.Glow.Color = new Color(ColorInstruction.r, ColorInstruction.g, ColorInstruction.b, 0.5f);
 
-            // Instruction glow
-            TextGlowHelper.AddGlow(_root, _instructionText, ColorInstruction);
+            var instResult = TMPTextFactory.Create(instCfg);
+            _instructionTMP = instResult.TMP;
+            _instructionTMP.text = "Thumbs up = YES    Wait = Cancel";
 
             // Timer bar fill (no background — just the bar itself)
             float barY = -0.035f;
@@ -209,6 +235,18 @@ namespace FingerPaint
             var mat = new Material(shader);
             mat.color = color;
             return mat;
+        }
+
+        private TMPTextFactory.GlowSettings GetGlowSettings()
+        {
+            return new TMPTextFactory.GlowSettings
+            {
+                Color = _glowColor,
+                Offset = _glowOffset,
+                Inner = _glowInner,
+                Outer = _glowOuter,
+                Power = _glowPower,
+            };
         }
     }
 }

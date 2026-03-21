@@ -148,12 +148,7 @@ namespace FingerPaint
 
         public static string GetExportDirectory()
         {
-#if UNITY_ANDROID && !UNITY_EDITOR
-            // On Quest, use public storage so files appear in the headset file browser
-            return Path.Combine("/storage/emulated/0", "EmptyTouch", "invisibleObject");
-#else
-            return Path.Combine(Application.persistentDataPath, "EmptyTouch", "invisibleObject");
-#endif
+            return Path.Combine(Application.persistentDataPath, "SavedWorks");
         }
 
         private static string MeshToObj(Mesh mesh, string objectName)

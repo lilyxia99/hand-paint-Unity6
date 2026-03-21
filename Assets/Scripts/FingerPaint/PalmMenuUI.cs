@@ -1,3 +1,4 @@
+using TMPro;
 using UnityEngine;
 
 namespace FingerPaint
@@ -5,8 +6,7 @@ namespace FingerPaint
     /// <summary>
     /// Shows floating icon labels above each palm when the user looks at them.
     /// Left palm: "Gallery"   Right palm: "Clear"
-    /// White text with a glow effect (duplicate TextMesh slightly scaled up + blurred).
-    /// No black backgrounds — text floats cleanly in VR.
+    /// Uses TextMeshPro with optional SDF glow.
     /// </summary>
     public class PalmMenuUI : MonoBehaviour
     {
@@ -24,22 +24,37 @@ namespace FingerPaint
         [Tooltip("Offset above the palm center in palm-normal direction (meters).")]
         [SerializeField] private float _hoverHeight = 0.08f;
 
-        [SerializeField] private float _iconScale = 0.0004f;
+        [SerializeField] private float _textScale = 0.004f;
 
         [Header("Labels")]
         [SerializeField] private string _leftLabel = "Gallery";
         [SerializeField] private string _rightLabel = "Clear";
+
+        [Header("Text")]
+        [Tooltip("Optional TMP font asset. Leave empty for the default TMP font.")]
+        [SerializeField] private TMP_FontAsset _font;
+
+        [Header("Glow (TMP Shader)")]
+        [Tooltip("Enable the TMP SDF shader glow effect.")]
+        [SerializeField] private bool _enableGlow = true;
+
+        [Tooltip("Drag TMP_SDF.shader here (Assets/TextMesh Pro/Shaders/TMP_SDF.shader).")]
+        [SerializeField] private Shader _sdfGlowShader;
+
+        [SerializeField] private Color _glowColor = new Color(0.5f, 0.8f, 1f, 0.5f);
+        [SerializeField] [Range(-1f, 1f)] private float _glowOffset = 0f;
+        [SerializeField] [Range(0f, 1f)] private float _glowInner = 0.15f;
+        [SerializeField] [Range(0f, 1f)] private float _glowOuter = 0.35f;
+        [SerializeField] [Range(0f, 1f)] private float _glowPower = 0.6f;
 
         // ─── Runtime ────────────────────────────────────────────────────
         private Camera _cam;
 
         // Left palm
         private Transform _leftRoot;
-        private MeshRenderer _leftTextRenderer;
 
         // Right palm
         private Transform _rightRoot;
-        private MeshRenderer _rightTextRenderer;
 
         // ─── Public state ───────────────────────────────────────────────
 
@@ -54,8 +69,8 @@ namespace FingerPaint
         private void Start()
         {
             _cam = Camera.main;
-            BuildIcon(ref _leftRoot, ref _leftTextRenderer, "PalmIcon_Left", _leftLabel);
-            BuildIcon(ref _rightRoot, ref _rightTextRenderer, "PalmIcon_Right", _rightLabel);
+            BuildIcon(ref _leftRoot, "PalmIcon_Left", _leftLabel);
+            BuildIcon(ref _rightRoot, "PalmIcon_Right", _rightLabel);
         }
 
         private void LateUpdate()
@@ -104,31 +119,41 @@ namespace FingerPaint
 
         // ─── Build icons ────────────────────────────────────────────────
 
-        private void BuildIcon(ref Transform root, ref MeshRenderer textRenderer,
-            string name, string label)
+        private void BuildIcon(ref Transform root, string name, string label)
         {
             var rootGO = new GameObject(name);
             rootGO.transform.SetParent(transform, false);
             root = rootGO.transform;
 
-            // Main text layer (crisp white)
-            var textGO = new GameObject(name + "_Text");
-            textGO.transform.SetParent(root, false);
-            var tm = textGO.AddComponent<TextMesh>();
-            tm.fontSize = 48;
-            tm.characterSize = _iconScale;
-            tm.anchor = TextAnchor.MiddleCenter;
-            tm.alignment = TextAlignment.Center;
-            tm.color = Color.white;
-            tm.text = label;
-            textGO.transform.localPosition = Vector3.zero;
-            textRenderer = textGO.GetComponent<MeshRenderer>();
+            var cfg = TMPTextFactory.Config.Default;
+            cfg.Name = name + "_Text";
+            cfg.Parent = root;
+            cfg.FontSize = 48f;
+            cfg.Color = Color.white;
+            cfg.LocalScale = _textScale;
+            cfg.RectSize = new Vector2(200f, 50f);
+            cfg.Font = _font;
+            cfg.GlowShader = _sdfGlowShader;
+            cfg.EnableGlow = _enableGlow;
+            cfg.Glow = GetGlowSettings();
 
-            // Multi-layer glow halo
-            TextGlowHelper.AddGlow(root, tm, Color.white);
+            var result = TMPTextFactory.Create(cfg);
+            result.TMP.text = label;
 
             // Start hidden
             rootGO.SetActive(false);
+        }
+
+        private TMPTextFactory.GlowSettings GetGlowSettings()
+        {
+            return new TMPTextFactory.GlowSettings
+            {
+                Color = _glowColor,
+                Offset = _glowOffset,
+                Inner = _glowInner,
+                Outer = _glowOuter,
+                Power = _glowPower,
+            };
         }
     }
 }

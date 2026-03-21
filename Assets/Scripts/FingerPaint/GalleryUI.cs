@@ -1,3 +1,4 @@
+using TMPro;
 using UnityEngine;
 using System.Collections.Generic;
 
@@ -5,9 +6,8 @@ namespace FingerPaint
 {
     /// <summary>
     /// Immersive gallery: when toggled ON, loads all saved works as 3D meshes
-    /// and places them in a ring around the player's current position (stationary).
-    /// A small hint UI follows the camera telling the user how to exit.
-    /// When toggled OFF (same gesture), all gallery objects are destroyed.
+    /// and places them in a ring around the player's current position.
+    /// Uses TextMeshPro for hint and label text with optional SDF glow.
     /// </summary>
     public class GalleryUI : MonoBehaviour
     {
@@ -31,6 +31,23 @@ namespace FingerPaint
         [SerializeField] private float _hintDistance = 0.6f;
         [SerializeField] private float _hintVerticalOffset = -0.15f;
 
+        [Header("Text")]
+        [Tooltip("Optional TMP font asset. Leave empty for the default TMP font.")]
+        [SerializeField] private TMP_FontAsset _font;
+
+        [Header("Glow (TMP Shader)")]
+        [Tooltip("Enable the TMP SDF shader glow effect.")]
+        [SerializeField] private bool _enableGlow = true;
+
+        [Tooltip("Drag TMP_SDF.shader here (Assets/TextMesh Pro/Shaders/TMP_SDF.shader).")]
+        [SerializeField] private Shader _sdfGlowShader;
+
+        [SerializeField] private Color _glowColor = new Color(0.5f, 0.8f, 1f, 0.5f);
+        [SerializeField] [Range(-1f, 1f)] private float _glowOffset = 0f;
+        [SerializeField] [Range(0f, 1f)] private float _glowInner = 0.15f;
+        [SerializeField] [Range(0f, 1f)] private float _glowOuter = 0.35f;
+        [SerializeField] [Range(0f, 1f)] private float _glowPower = 0.6f;
+
         // ─── State ──────────────────────────────────────────────────────
 
         private bool _isVisible;
@@ -42,8 +59,7 @@ namespace FingerPaint
 
         // Hint UI elements
         private Transform _hintRoot;
-        private TextMesh _hintText;
-        private TextMesh[] _hintGlows;
+        private TextMeshPro _hintTMP;
         private bool _hintBuilt;
 
         // Label elements (per-object)
@@ -65,7 +81,6 @@ namespace FingerPaint
             if (count == 0)
             {
                 Debug.Log("[GalleryUI] No saved works to display.");
-                // Show a brief "no works" hint
                 ShowHint("No saved works yet");
                 return;
             }
@@ -125,7 +140,7 @@ namespace FingerPaint
                 _spawnedObjects.Add(go);
 
                 // Add a floating label below each object
-                CreateLabel(go.transform, entry, i, worldPos);
+                CreateLabel(entry, i, worldPos);
             }
 
             ShowHint("Look at left palm + pinch to exit gallery");
@@ -136,21 +151,18 @@ namespace FingerPaint
         {
             _isVisible = false;
 
-            // Destroy spawned objects
             foreach (var go in _spawnedObjects)
             {
                 if (go != null) Destroy(go);
             }
             _spawnedObjects.Clear();
 
-            // Destroy labels
             foreach (var go in _labelObjects)
             {
                 if (go != null) Destroy(go);
             }
             _labelObjects.Clear();
 
-            // Cleanup loaded meshes
             foreach (var mesh in _loadedMeshes)
             {
                 if (mesh != null) Destroy(mesh);
@@ -188,7 +200,6 @@ namespace FingerPaint
                     go.transform.Rotate(Vector3.up, _rotationSpeed * Time.deltaTime, Space.World);
             }
 
-            // Update hint UI to follow the camera
             UpdateHintFollow();
         }
 
@@ -199,11 +210,9 @@ namespace FingerPaint
             if (!_hintBuilt)
                 BuildHint();
 
-            _hintText.text = message;
-            TextGlowHelper.SetText(_hintGlows, message);
+            _hintTMP.text = message;
             _hintRoot.gameObject.SetActive(true);
 
-            // Snap to position
             if (_cam != null)
                 SnapHintToCamera();
         }
@@ -256,22 +265,23 @@ namespace FingerPaint
             _hintRoot = new GameObject("GalleryHint").transform;
             _hintRoot.SetParent(transform, false);
 
-            // Main text
-            var textGO = new GameObject("HintText");
-            textGO.transform.SetParent(_hintRoot, false);
-
             Color hintColor = new Color(0.8f, 0.9f, 1f);
-            _hintText = textGO.AddComponent<TextMesh>();
-            _hintText.fontSize = 36;
-            _hintText.characterSize = 0.005f;
-            _hintText.anchor = TextAnchor.MiddleCenter;
-            _hintText.alignment = TextAlignment.Center;
-            _hintText.color = hintColor;
-            _hintText.text = "";
-            textGO.transform.localPosition = Vector3.zero;
 
-            // Multi-layer glow
-            _hintGlows = TextGlowHelper.AddGlow(_hintRoot, _hintText, hintColor);
+            var cfg = TMPTextFactory.Config.Default;
+            cfg.Name = "HintText";
+            cfg.Parent = _hintRoot;
+            cfg.FontSize = 36f;
+            cfg.Color = hintColor;
+            cfg.LocalScale = 0.005f;
+            cfg.RectSize = new Vector2(600f, 100f);
+            cfg.Font = _font;
+            cfg.GlowShader = _sdfGlowShader;
+            cfg.EnableGlow = _enableGlow;
+            cfg.Glow = GetGlowSettings();
+            cfg.Glow.Color = new Color(hintColor.r, hintColor.g, hintColor.b, 0.5f);
+
+            var result = TMPTextFactory.Create(cfg);
+            _hintTMP = result.TMP;
 
             _hintRoot.gameObject.SetActive(false);
             _hintBuilt = true;
@@ -279,10 +289,9 @@ namespace FingerPaint
 
         // ─── Per-object labels ──────────────────────────────────────────
 
-        private void CreateLabel(Transform parent, GalleryEntry entry, int index, Vector3 objPos)
+        private void CreateLabel(GalleryEntry entry, int index, Vector3 objPos)
         {
             var labelGO = new GameObject($"GalleryLabel_{index}");
-            // Position below the object, independent (not parented, stays stationary)
             labelGO.transform.position = objPos + Vector3.down * (_objectScale * 0.7f);
 
             // Face the camera
@@ -294,12 +303,20 @@ namespace FingerPaint
                     labelGO.transform.rotation = Quaternion.LookRotation(lookDir, Vector3.up);
             }
 
-            var tm = labelGO.AddComponent<TextMesh>();
-            tm.fontSize = 28;
-            tm.characterSize = 0.004f;
-            tm.anchor = TextAnchor.UpperCenter;
-            tm.alignment = TextAlignment.Center;
-            tm.color = new Color(0.7f, 0.8f, 1f);
+            var cfg = TMPTextFactory.Config.Default;
+            cfg.Name = "LabelText";
+            cfg.Parent = labelGO.transform;
+            cfg.FontSize = 28f;
+            cfg.Color = new Color(0.7f, 0.8f, 1f);
+            cfg.Alignment = TextAlignmentOptions.Top;
+            cfg.LocalScale = 0.004f;
+            cfg.RectSize = new Vector2(300f, 80f);
+            cfg.Font = _font;
+            cfg.GlowShader = _sdfGlowShader;
+            cfg.EnableGlow = _enableGlow;
+            cfg.Glow = GetGlowSettings();
+
+            var result = TMPTextFactory.Create(cfg);
 
             // Format: date + point count
             string display;
@@ -308,7 +325,7 @@ namespace FingerPaint
             else
                 display = entry.id;
 
-            tm.text = $"{display}\n{entry.pointCount} pts";
+            result.TMP.text = $"{display}\n{entry.pointCount} pts";
 
             _labelObjects.Add(labelGO);
         }
@@ -324,7 +341,6 @@ namespace FingerPaint
 
         private static Material CreateGalleryMat(int index, int total)
         {
-            // Give each object a unique hue from a gradient
             float hue = (float)index / Mathf.Max(1, total);
             Color color = Color.HSVToRGB(hue, 0.5f, 0.9f);
 
@@ -337,13 +353,18 @@ namespace FingerPaint
             return mat;
         }
 
-        private static Material CreateUnlitMat(Color color)
+        // ─── Glow helper ───────────────────────────────────────────────
+
+        private TMPTextFactory.GlowSettings GetGlowSettings()
         {
-            var shader = Shader.Find("Unlit/Color")
-                      ?? Shader.Find("Universal Render Pipeline/Unlit");
-            var mat = new Material(shader);
-            mat.color = color;
-            return mat;
+            return new TMPTextFactory.GlowSettings
+            {
+                Color = _glowColor,
+                Offset = _glowOffset,
+                Inner = _glowInner,
+                Outer = _glowOuter,
+                Power = _glowPower,
+            };
         }
     }
 }

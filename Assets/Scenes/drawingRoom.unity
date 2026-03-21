@@ -201,9 +201,17 @@ MonoBehaviour:
   _gazeDotThreshold: 0.85
   _palmFacingDotThreshold: 0.4
   _hoverHeight: 0.06
-  _iconScale: 0.0004
+  _textScale: 0.004
   _leftLabel: Gallery
   _rightLabel: Clear
+  _font: {fileID: 0}
+  _enableGlow: 1
+  _sdfGlowShader: {fileID: 0}
+  _glowColor: {r: 0.5, g: 0.8, b: 1, a: 0.5}
+  _glowOffset: 0
+  _glowInner: 0.15
+  _glowOuter: 0.35
+  _glowPower: 0.6
 --- !u!114 &20724435
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -616,12 +624,20 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::FingerPaint.GalleryUI
   _galleryManager: {fileID: 668022994}
-  _ringRadius: 2
+  _ringRadius: 0.5
   _heightOffset: -0.3
-  _objectScale: 0.15
+  _objectScale: 0.5
   _rotationSpeed: 20
   _hintDistance: 0.6
-  _hintVerticalOffset: -0.15
+  _hintVerticalOffset: -0.14
+  _font: {fileID: 11400000, guid: ef4f0b7f64e96994ba863a530ce59c6f, type: 2}
+  _enableGlow: 1
+  _sdfGlowShader: {fileID: 4800000, guid: 68e6db2ebdc24f95958faec2be5558d6, type: 3}
+  _glowColor: {r: 0.5, g: 0.8, b: 1, a: 0.5}
+  _glowOffset: 0
+  _glowInner: 0.15
+  _glowOuter: 0.35
+  _glowPower: 0.6
 --- !u!114 &668022994
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -664,6 +680,15 @@ MonoBehaviour:
   _displayDuration: 2
   _distance: 0.5
   _verticalOffset: 0.05
+  _font: {fileID: 0}
+  _baseColor: {r: 0.5, g: 1, b: 0.6, a: 1}
+  _enableGlow: 1
+  _sdfGlowShader: {fileID: 0}
+  _glowColor: {r: 0.5, g: 1, b: 0.6, a: 0.5}
+  _glowOffset: 0
+  _glowInner: 0.15
+  _glowOuter: 0.35
+  _glowPower: 0.6
 --- !u!4 &702354065 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 1717954561962503726, guid: f6336ac4ac8b4d34bc5072418cdc62a0, type: 3}
@@ -1377,6 +1402,14 @@ MonoBehaviour:
   _panelWidth: 0.35
   _distance: 0.5
   _verticalOffset: 0.05
+  _font: {fileID: 0}
+  _enableGlow: 1
+  _sdfGlowShader: {fileID: 0}
+  _glowColor: {r: 1, g: 0.85, b: 0.7, a: 0.5}
+  _glowOffset: 0
+  _glowInner: 0.15
+  _glowOuter: 0.35
+  _glowPower: 0.6
 --- !u!4 &1582015692
 Transform:
   m_ObjectHideFlags: 0
