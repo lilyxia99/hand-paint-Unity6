@@ -29,9 +29,15 @@ namespace FingerPaint
         [SerializeField] private float _fontSize = 36f;
         [SerializeField] private Color _textColor = Color.white;
 
+        [Tooltip("Optional TMP font asset. Leave empty to use the TMP default font.")]
+        [SerializeField] private TMP_FontAsset _font;
+
         [Header("Glow (TMP Shader)")]
         [Tooltip("Enable the TMP SDF shader glow effect.")]
         [SerializeField] private bool _enableGlow = true;
+
+        [Tooltip("Drag the 'TextMeshPro/Distance Field' shader here (Assets/TextMesh Pro/Shaders/TMP_SDF.shader). Required for glow to work.")]
+        [SerializeField] private Shader _sdfGlowShader;
 
         [Tooltip("Glow color.")]
         [SerializeField] private Color _glowColor = new Color(0.5f, 0.8f, 1f, 0.5f);
@@ -154,6 +160,11 @@ namespace FingerPaint
             var textGO = new GameObject("SubtitleText");
             textGO.transform.SetParent(_root, false);
             _tmp = textGO.AddComponent<TextMeshPro>();
+
+            // Apply custom font if assigned
+            if (_font != null)
+                _tmp.font = _font;
+
             _tmp.fontSize = _fontSize;
             _tmp.color = _textColor;
             _tmp.alignment = TextAlignmentOptions.Center;
@@ -194,8 +205,10 @@ namespace FingerPaint
             _glowStateCached = _enableGlow;
             if (_matInstance == null) return;
 
-            if (_enableGlow)
+            if (_enableGlow && _sdfGlowShader != null)
             {
+                // Swap to the full SDF shader which supports GLOW_ON
+                _matInstance.shader = _sdfGlowShader;
                 _matInstance.EnableKeyword("GLOW_ON");
                 _matInstance.SetColor(ID_GlowColor,  _glowColor);
                 _matInstance.SetFloat(ID_GlowOffset, _glowOffset);

@@ -202,8 +202,6 @@ MonoBehaviour:
   _palmFacingDotThreshold: 0.4
   _hoverHeight: 0.06
   _iconScale: 0.0004
-  _bgPadH: 0.015
-  _bgPadV: 0.006
   _leftLabel: Gallery
   _rightLabel: Clear
 --- !u!114 &20724435
@@ -666,8 +664,6 @@ MonoBehaviour:
   _displayDuration: 2
   _distance: 0.5
   _verticalOffset: 0.05
-  _panelWidth: 0.28
-  _panelHeight: 0.07
 --- !u!4 &702354065 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 1717954561962503726, guid: f6336ac4ac8b4d34bc5072418cdc62a0, type: 3}
@@ -1025,14 +1021,16 @@ MonoBehaviour:
   _verticalOffset: -0.25
   _horizontalOffset: 0
   _followSpeed: 5
-  _panelWidth: 0.5
-  _panelHeight: 0.08
-  _bgColor: {r: 0, g: 0, b: 0, a: 0.65}
-  _paddingH: 0.02
-  _paddingV: 0.01
   _fontSize: 48
-  _characterSize: 0.005
   _textColor: {r: 1, g: 1, b: 1, a: 1}
+  _font: {fileID: 11400000, guid: ef4f0b7f64e96994ba863a530ce59c6f, type: 2}
+  _enableGlow: 1
+  _sdfGlowShader: {fileID: 4800000, guid: 68e6db2ebdc24f95958faec2be5558d6, type: 3}
+  _glowColor: {r: 0.9453207, g: 0.9622642, b: 0.89417946, a: 0.5}
+  _glowOffset: 0
+  _glowInner: 0.15
+  _glowOuter: 0.614
+  _glowPower: 0.47
 --- !u!4 &1195711748
 Transform:
   m_ObjectHideFlags: 0
@@ -1377,7 +1375,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::FingerPaint.ClearConfirmationUI
   _panelWidth: 0.35
-  _panelHeight: 0.12
   _distance: 0.5
   _verticalOffset: 0.05
 --- !u!4 &1582015692
