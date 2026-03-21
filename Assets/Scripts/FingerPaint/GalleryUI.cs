@@ -16,7 +16,7 @@ namespace FingerPaint
 
         [Header("Placement")]
         [Tooltip("Radius of the ring where objects are placed around the player (meters).")]
-        [SerializeField] private float _ringRadius = 2.0f;
+        [SerializeField] private float _ringRadius = 1.0f;
 
         [Tooltip("Height of the objects relative to player's eye level (meters).")]
         [SerializeField] private float _heightOffset = -0.3f;
@@ -43,6 +43,7 @@ namespace FingerPaint
         // Hint UI elements
         private Transform _hintRoot;
         private TextMesh _hintText;
+        private TextMesh[] _hintGlows;
         private bool _hintBuilt;
 
         // Label elements (per-object)
@@ -199,6 +200,7 @@ namespace FingerPaint
                 BuildHint();
 
             _hintText.text = message;
+            TextGlowHelper.SetText(_hintGlows, message);
             _hintRoot.gameObject.SetActive(true);
 
             // Snap to position
@@ -254,33 +256,22 @@ namespace FingerPaint
             _hintRoot = new GameObject("GalleryHint").transform;
             _hintRoot.SetParent(transform, false);
 
-            // Background
-            var bgGO = GameObject.CreatePrimitive(PrimitiveType.Quad);
-            bgGO.name = "HintBG";
-            bgGO.transform.SetParent(_hintRoot, false);
-            bgGO.transform.localScale = new Vector3(0.35f, 0.05f, 1f);
-            bgGO.transform.localPosition = Vector3.zero;
-
-            var col = bgGO.GetComponent<Collider>();
-            if (col != null) Destroy(col);
-
-            var bgMat = CreateUnlitMat(new Color(0.05f, 0.05f, 0.1f, 0.85f));
-            bgMat.renderQueue = 3000;
-            bgGO.GetComponent<MeshRenderer>().sharedMaterial = bgMat;
-
-            // Text
+            // Main text
             var textGO = new GameObject("HintText");
             textGO.transform.SetParent(_hintRoot, false);
 
+            Color hintColor = new Color(0.8f, 0.9f, 1f);
             _hintText = textGO.AddComponent<TextMesh>();
             _hintText.fontSize = 36;
             _hintText.characterSize = 0.005f;
             _hintText.anchor = TextAnchor.MiddleCenter;
             _hintText.alignment = TextAlignment.Center;
-            _hintText.color = new Color(0.8f, 0.9f, 1f);
+            _hintText.color = hintColor;
             _hintText.text = "";
+            textGO.transform.localPosition = Vector3.zero;
 
-            textGO.transform.localPosition = new Vector3(0f, 0f, -0.002f);
+            // Multi-layer glow
+            _hintGlows = TextGlowHelper.AddGlow(_hintRoot, _hintText, hintColor);
 
             _hintRoot.gameObject.SetActive(false);
             _hintBuilt = true;

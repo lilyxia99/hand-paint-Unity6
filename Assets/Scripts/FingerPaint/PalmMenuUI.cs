@@ -5,13 +5,8 @@ namespace FingerPaint
     /// <summary>
     /// Shows floating icon labels above each palm when the user looks at them.
     /// Left palm: "Gallery"   Right palm: "Clear"
-    /// Uses TextMesh (white, monochromatic) — Quad background + TextMesh foreground.
-    ///
-    /// Inspired by Meta SDK PalmMenu: positions icons relative to the palm joint
-    /// with world-space LookRotation toward the camera.
-    ///
-    /// Gaze detection: checks that the palm faces the camera AND the camera
-    /// looks toward the palm (i.e., user actively looks at their hand).
+    /// White text with a glow effect (duplicate TextMesh slightly scaled up + blurred).
+    /// No black backgrounds — text floats cleanly in VR.
     /// </summary>
     public class PalmMenuUI : MonoBehaviour
     {
@@ -19,19 +14,17 @@ namespace FingerPaint
         [SerializeField] private HandTrackingManager _handTracking;
 
         [Header("Gaze Detection")]
-        [Tooltip("Min dot(cameraForward, toPalm) to count as 'looking at palm'. 0.7 ≈ 45° cone.")]
-        [SerializeField] private float _gazeDotThreshold = 0.7f;
+        [Tooltip("Min dot(cameraForward, toPalm) to count as 'looking at palm'. 0.55 ≈ 56° cone.")]
+        [SerializeField] private float _gazeDotThreshold = 0.55f;
 
         [Tooltip("Min dot(palmNormal, toCamera) to count as 'palm facing camera'.")]
-        [SerializeField] private float _palmFacingDotThreshold = 0.3f;
+        [SerializeField] private float _palmFacingDotThreshold = 0.2f;
 
         [Header("Appearance")]
         [Tooltip("Offset above the palm center in palm-normal direction (meters).")]
         [SerializeField] private float _hoverHeight = 0.08f;
 
         [SerializeField] private float _iconScale = 0.0004f;
-        [SerializeField] private float _bgPadH = 0.015f;
-        [SerializeField] private float _bgPadV = 0.006f;
 
         [Header("Labels")]
         [SerializeField] private string _leftLabel = "Gallery";
@@ -40,21 +33,13 @@ namespace FingerPaint
         // ─── Runtime ────────────────────────────────────────────────────
         private Camera _cam;
 
-        // Left palm icon
+        // Left palm
         private Transform _leftRoot;
-        private TextMesh _leftText;
         private MeshRenderer _leftTextRenderer;
-        private Transform _leftBg;
-        private MeshRenderer _leftBgRenderer;
-        private Material _leftBgMat;
 
-        // Right palm icon
+        // Right palm
         private Transform _rightRoot;
-        private TextMesh _rightText;
         private MeshRenderer _rightTextRenderer;
-        private Transform _rightBg;
-        private MeshRenderer _rightBgRenderer;
-        private Material _rightBgMat;
 
         // ─── Public state ───────────────────────────────────────────────
 
@@ -69,12 +54,8 @@ namespace FingerPaint
         private void Start()
         {
             _cam = Camera.main;
-            BuildIcon(ref _leftRoot, ref _leftText, ref _leftTextRenderer,
-                      ref _leftBg, ref _leftBgRenderer, ref _leftBgMat,
-                      "PalmIcon_Left", _leftLabel);
-            BuildIcon(ref _rightRoot, ref _rightText, ref _rightTextRenderer,
-                      ref _rightBg, ref _rightBgRenderer, ref _rightBgMat,
-                      "PalmIcon_Right", _rightLabel);
+            BuildIcon(ref _leftRoot, ref _leftTextRenderer, "PalmIcon_Left", _leftLabel);
+            BuildIcon(ref _rightRoot, ref _rightTextRenderer, "PalmIcon_Right", _rightLabel);
         }
 
         private void LateUpdate()
@@ -83,25 +64,13 @@ namespace FingerPaint
             if (_cam == null) _cam = Camera.main;
             if (_cam == null) return;
 
-            IsGazingLeftPalm = UpdatePalmIcon(
-                isLeft: true,
-                _leftRoot, _leftTextRenderer, _leftBgRenderer, _leftBgMat);
-
-            IsGazingRightPalm = UpdatePalmIcon(
-                isLeft: false,
-                _rightRoot, _rightTextRenderer, _rightBgRenderer, _rightBgMat);
-        }
-
-        private void OnDestroy()
-        {
-            if (_leftBgMat != null) Destroy(_leftBgMat);
-            if (_rightBgMat != null) Destroy(_rightBgMat);
+            IsGazingLeftPalm = UpdatePalmIcon(true, _leftRoot);
+            IsGazingRightPalm = UpdatePalmIcon(false, _rightRoot);
         }
 
         // ─── Per-palm update ────────────────────────────────────────────
 
-        private bool UpdatePalmIcon(bool isLeft, Transform root,
-            MeshRenderer textRenderer, MeshRenderer bgRenderer, Material bgMat)
+        private bool UpdatePalmIcon(bool isLeft, Transform root)
         {
             bool gazing = false;
 
@@ -120,85 +89,46 @@ namespace FingerPaint
 
                 gazing = palmDot > _palmFacingDotThreshold && gazeDot > _gazeDotThreshold;
 
-                // Always position the icon even if not gazing, so it's ready
+                // Always position so it's ready
                 Vector3 iconPos = palmPos + palmNormal * _hoverHeight;
                 root.position = iconPos;
 
-                // Face the camera (billboard)
                 Vector3 lookDir = iconPos - camPos;
                 if (lookDir.sqrMagnitude > 0.001f)
                     root.rotation = Quaternion.LookRotation(lookDir, Vector3.up);
             }
 
-            // Show/hide
-            bool shouldShow = gazing;
-            root.gameObject.SetActive(shouldShow);
-
+            root.gameObject.SetActive(gazing);
             return gazing;
         }
 
         // ─── Build icons ────────────────────────────────────────────────
 
-        private void BuildIcon(ref Transform root, ref TextMesh text,
-            ref MeshRenderer textRenderer, ref Transform bg,
-            ref MeshRenderer bgRenderer, ref Material bgMat,
+        private void BuildIcon(ref Transform root, ref MeshRenderer textRenderer,
             string name, string label)
         {
-            // Root container
             var rootGO = new GameObject(name);
             rootGO.transform.SetParent(transform, false);
             root = rootGO.transform;
 
-            // Background quad
-            var bgGO = GameObject.CreatePrimitive(PrimitiveType.Quad);
-            bgGO.name = name + "_BG";
-            bgGO.transform.SetParent(root, false);
-
-            var col = bgGO.GetComponent<Collider>();
-            if (col != null) Destroy(col);
-
-            bgMat = CreateUnlitTransparentMat(new Color(0f, 0f, 0f, 0.65f));
-            bgRenderer = bgGO.GetComponent<MeshRenderer>();
-            bgRenderer.sharedMaterial = bgMat;
-            bg = bgGO.transform;
-
-            // TextMesh label
+            // Main text layer (crisp white)
             var textGO = new GameObject(name + "_Text");
             textGO.transform.SetParent(root, false);
-
-            text = textGO.AddComponent<TextMesh>();
-            text.fontSize = 48;
-            text.characterSize = _iconScale;
-            text.anchor = TextAnchor.MiddleCenter;
-            text.alignment = TextAlignment.Center;
-            text.color = Color.white;
-            text.text = label;
-
+            var tm = textGO.AddComponent<TextMesh>();
+            tm.fontSize = 48;
+            tm.characterSize = _iconScale;
+            tm.anchor = TextAnchor.MiddleCenter;
+            tm.alignment = TextAlignment.Center;
+            tm.color = Color.white;
+            tm.text = label;
+            textGO.transform.localPosition = Vector3.zero;
             textRenderer = textGO.GetComponent<MeshRenderer>();
-            textGO.transform.localPosition = new Vector3(0f, 0f, -0.001f);
 
-            // Size background to fit text (approximate)
-            // TextMesh bounds aren't available until rendered, so estimate
-            float charW = _iconScale * 0.55f; // approximate char width
-            float textW = label.Length * charW;
-            float textH = _iconScale * 1.2f; // approximate height
-            bg.localScale = new Vector3(textW + _bgPadH * 2f, textH + _bgPadV * 2f, 1f);
+            // Multi-layer glow halo
+            TextGlowHelper.AddGlow(root, tm, Color.white);
 
             // Start hidden
             rootGO.SetActive(false);
-        }
-
-        // ─── Material helper ────────────────────────────────────────────
-
-        private static Material CreateUnlitTransparentMat(Color color)
-        {
-            // Use Unlit/Transparent or fall back
-            var shader = Shader.Find("Unlit/Color")
-                      ?? Shader.Find("Universal Render Pipeline/Unlit");
-            var mat = new Material(shader);
-            mat.color = color;
-            mat.renderQueue = 3100; // Render on top
-            return mat;
         }
     }
 }

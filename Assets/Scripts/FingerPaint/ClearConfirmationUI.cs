@@ -5,13 +5,12 @@ namespace FingerPaint
     /// <summary>
     /// World-space confirmation panel that appears when the clear gesture is triggered.
     /// Shows "Really cleaning?" with a countdown timer bar.
-    /// Uses Quad + TextMesh (no Canvas/UGUI), follows head like VoiceDebugUI.
+    /// Multi-layer glow text — no black backgrounds.
     /// </summary>
     public class ClearConfirmationUI : MonoBehaviour
     {
         [Header("Panel")]
         [SerializeField] private float _panelWidth = 0.35f;
-        [SerializeField] private float _panelHeight = 0.12f;
         [SerializeField] private float _distance = 0.5f;
         [SerializeField] private float _verticalOffset = 0.05f;
 
@@ -35,9 +34,8 @@ namespace FingerPaint
 
         // ─── Colors ─────────────────────────────────────────────────────
 
-        private static readonly Color ColorBg      = new Color(0.2f, 0.02f, 0.02f, 0.88f);
-        private static readonly Color ColorTimer   = new Color(1f, 0.3f, 0.2f, 0.95f);
-        private static readonly Color ColorMessage = new Color(1f, 0.85f, 0.7f);
+        private static readonly Color ColorTimer       = new Color(1f, 0.3f, 0.2f, 0.95f);
+        private static readonly Color ColorMessage     = new Color(1f, 0.85f, 0.7f);
         private static readonly Color ColorInstruction = new Color(0.8f, 0.8f, 0.6f);
 
         // ─── Public API ─────────────────────────────────────────────────
@@ -52,7 +50,6 @@ namespace FingerPaint
             ElapsedTime = 0f;
             _root.gameObject.SetActive(true);
 
-            // Snap to position immediately
             if (_mainCam != null)
             {
                 var camT = _mainCam.transform;
@@ -129,12 +126,10 @@ namespace FingerPaint
             s.x = barWidth;
             _timerBarFill.localScale = s;
 
-            // Anchor to left
             var p = _timerBarFill.localPosition;
             p.x = -maxWidth * 0.5f + barWidth * 0.5f;
             _timerBarFill.localPosition = p;
 
-            // Color shifts to darker as time runs out
             _timerBarMat.color = Color.Lerp(
                 new Color(0.4f, 0.1f, 0.1f, 0.7f),
                 ColorTimer,
@@ -148,11 +143,6 @@ namespace FingerPaint
             _root = new GameObject("ClearConfirmPanel").transform;
             _root.SetParent(transform, false);
 
-            // Background
-            var bg = CreateQuad("BG", _root, _panelWidth, _panelHeight);
-            SetColor(bg, ColorBg);
-            bg.localPosition = Vector3.zero;
-
             // Message text
             var msgGO = new GameObject("MessageText");
             msgGO.transform.SetParent(_root, false);
@@ -163,7 +153,10 @@ namespace FingerPaint
             _messageText.alignment = TextAlignment.Center;
             _messageText.color = ColorMessage;
             _messageText.text = "Really cleaning?";
-            msgGO.transform.localPosition = new Vector3(0f, 0.025f, -0.002f);
+            msgGO.transform.localPosition = new Vector3(0f, 0.025f, 0f);
+
+            // Message glow
+            TextGlowHelper.AddGlow(_root, _messageText, ColorMessage);
 
             // Instruction text
             var instGO = new GameObject("InstructionText");
@@ -175,18 +168,16 @@ namespace FingerPaint
             _instructionText.alignment = TextAlignment.Center;
             _instructionText.color = ColorInstruction;
             _instructionText.text = "Thumbs up = YES    Wait = Cancel";
-            instGO.transform.localPosition = new Vector3(0f, 0.002f, -0.002f);
+            instGO.transform.localPosition = new Vector3(0f, 0.002f, 0f);
 
-            // Timer bar background
+            // Instruction glow
+            TextGlowHelper.AddGlow(_root, _instructionText, ColorInstruction);
+
+            // Timer bar fill (no background — just the bar itself)
             float barY = -0.035f;
             float barH = 0.012f;
             float barW = _panelWidth * 0.85f;
 
-            var barBg = CreateQuad("TimerBG", _root, barW, barH);
-            SetColor(barBg, new Color(0.08f, 0.08f, 0.08f));
-            barBg.localPosition = new Vector3(0f, barY, -0.0005f);
-
-            // Timer bar fill
             _timerBarFill = CreateQuad("TimerFill", _root, barW, barH * 0.85f);
             _timerBarMat = CreateUnlitMat(ColorTimer);
             _timerBarFill.GetComponent<MeshRenderer>().sharedMaterial = _timerBarMat;
@@ -209,14 +200,6 @@ namespace FingerPaint
             if (col != null) Destroy(col);
 
             return go.transform;
-        }
-
-        private static void SetColor(Transform quad, Color color)
-        {
-            var mr = quad.GetComponent<MeshRenderer>();
-            var mat = CreateUnlitMat(color);
-            mat.renderQueue = 3000;
-            mr.sharedMaterial = mat;
         }
 
         private static Material CreateUnlitMat(Color color)

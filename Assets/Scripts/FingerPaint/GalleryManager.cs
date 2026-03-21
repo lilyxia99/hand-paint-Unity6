@@ -26,7 +26,7 @@ namespace FingerPaint
 
         private void Awake()
         {
-            _saveDirectory = Path.Combine(Application.persistentDataPath, "SavedWorks");
+            _saveDirectory = MeshExporter.GetExportDirectory();
             _manifestPath = Path.Combine(_saveDirectory, "gallery_manifest.json");
             LoadManifest();
         }
