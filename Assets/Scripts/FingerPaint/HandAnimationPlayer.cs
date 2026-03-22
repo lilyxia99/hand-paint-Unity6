@@ -55,6 +55,11 @@ namespace FingerPaint
         [Tooltip("Reference to a SubtitleDisplay component in the scene.")]
         [SerializeField] private SubtitleDisplay _subtitleDisplay;
 
+        [Header("Partner Sync")]
+        [Tooltip("The other hand's HandAnimationPlayer. If left empty, auto-discovers at Start. " +
+                 "Both hands loop together — whichever has audio determines the loop point.")]
+        [SerializeField] private HandAnimationPlayer _partnerPlayer;
+
         [Header("Material Override")]
         [Tooltip("Optional material to apply to the hand mesh. Leave null for the prefab default.")]
         [SerializeField] private Material _handMaterial;
@@ -67,6 +72,14 @@ namespace FingerPaint
         private bool _playbackStartPending;
         private float _pendingStartTime;
         private List<SrtParser.SrtEntry> _subtitleEntries;
+        private float _effectiveLoopDuration = -1f; // min(animLength, audioLength)
+        private bool _loopDurationResolved;
+        private bool _isLoopingFromPartner; // prevent infinite recursion
+        private Transform _cachedXROrigin;
+        private Vector3 _lastKnownXROriginPos;
+        private Quaternion _lastKnownXROriginRot;
+        private float _savedSpeed = 1f; // speed before pausing
+        private bool _isPaused;
 
         // ─── Public API ─────────────────────────────────────────────────
 
@@ -82,27 +95,101 @@ namespace FingerPaint
 
         /// <summary>
         /// Restart playback from the beginning (animation + voice).
+        /// Also restarts the partner player if one is linked.
         /// </summary>
         public void Restart()
         {
+            RestartSelf();
+            // Also restart partner (without recursion)
+            if (_partnerPlayer != null && !_isLoopingFromPartner)
+            {
+                _partnerPlayer._isLoopingFromPartner = true;
+                _partnerPlayer.RestartSelf();
+                _partnerPlayer._isLoopingFromPartner = false;
+            }
+        }
+
+        /// <summary>
+        /// Restart just this player (no partner sync). Used internally.
+        /// Uses Play (hard snap to frame 0) — CrossFade to the same state
+        /// doesn't reliably restart in Unity and caused XR Origin displacement.
+        /// </summary>
+        private void RestartSelf()
+        {
             if (_animator != null)
-                _animator.Play(_animator.GetCurrentAnimatorStateInfo(0).shortNameHash, 0, 0f);
+            {
+                // Save XR Origin position before the animator transition
+                Transform xrOrigin = _cachedXROrigin;
+                Vector3 savedPos = Vector3.zero;
+                Quaternion savedRot = Quaternion.identity;
+                bool hasXR = xrOrigin != null;
+                if (hasXR)
+                {
+                    savedPos = xrOrigin.position;
+                    savedRot = xrOrigin.rotation;
+                }
+
+                var stateInfo = _animator.GetCurrentAnimatorStateInfo(0);
+                _animator.Play(stateInfo.shortNameHash, 0, 0f);
+
+                // Restore XR Origin if it got displaced
+                if (hasXR)
+                {
+                    if (Vector3.Distance(xrOrigin.position, savedPos) > 0.01f)
+                    {
+                        Debug.LogWarning($"[HandAnimationPlayer] XR Origin was displaced from {savedPos} to {xrOrigin.position} during loop restart — restoring.");
+                        xrOrigin.position = savedPos;
+                        xrOrigin.rotation = savedRot;
+                    }
+                }
+            }
             RestartAudio();
         }
 
         /// <summary>
-        /// Pause or resume playback (animation + voice).
+        /// Effective loop duration resolved by the player with audio.
+        /// The partner reads this to know when to loop.
         /// </summary>
-        public void SetPaused(bool paused)
+        public float EffectiveLoopDuration => _effectiveLoopDuration;
+        public bool HasLoopDurationResolved => _loopDurationResolved;
+
+        /// <summary>
+        /// Pause or resume playback (animation + voice).
+        /// Remembers the speed before pausing so resume restores it (e.g. 5x).
+        /// Also pauses/resumes the partner player.
+        /// </summary>
+        public void SetPaused(bool paused, bool syncPartner = true)
         {
+            _isPaused = paused;
+
             if (_animator != null)
-                _animator.speed = paused ? 0f : 1f;
+            {
+                if (paused)
+                {
+                    _savedSpeed = _animator.speed > 0f ? _animator.speed : 1f;
+                    _animator.speed = 0f;
+                }
+                else
+                {
+                    _animator.speed = _savedSpeed;
+                }
+            }
 
             if (_audioSource != null && _audioSource.clip != null)
             {
-                if (paused) _audioSource.Pause();
-                else _audioSource.UnPause();
+                if (paused)
+                {
+                    _audioSource.Pause();
+                }
+                else
+                {
+                    _audioSource.pitch = _savedSpeed;
+                    _audioSource.UnPause();
+                }
             }
+
+            if (syncPartner && _partnerPlayer != null)
+                _partnerPlayer.SetPaused(paused, false);
         }
 
         // ─── Lifecycle ──────────────────────────────────────────────────
@@ -122,6 +209,23 @@ namespace FingerPaint
             }
 
             SetupHand();
+
+            // Cache XR Origin so we can protect it from teleportation during loop restarts
+            CacheXROrigin();
+
+            // Auto-discover partner if not manually assigned
+            if (_partnerPlayer == null)
+            {
+                foreach (var player in FindObjectsOfType<HandAnimationPlayer>())
+                {
+                    if (player != this)
+                    {
+                        _partnerPlayer = player;
+                        Debug.Log($"[HandAnimationPlayer] Auto-linked partner: {player.name}");
+                        break;
+                    }
+                }
+            }
 
             // Parse subtitle file if assigned
             if (_subtitleFile != null)
@@ -200,24 +304,105 @@ namespace FingerPaint
             // ── Loop handling ────────────────────────────────────────────
             if (_loop && _animator.runtimeAnimatorController != null)
             {
-                if (_animator.IsInTransition(0))
+                // Don't trigger loop when paused
+                if (_isPaused)
+                    return;
+
+                // If partner triggered our restart, skip own loop detection this frame
+                if (_isLoopingFromPartner)
                     return;
 
                 var stateInfo = _animator.GetCurrentAnimatorStateInfo(0);
-                if (stateInfo.normalizedTime >= 1.0f)
+                float animLength = stateInfo.length;
+
+                // Resolve effective loop duration once we know both lengths
+                if (!_loopDurationResolved && animLength > 0f)
                 {
-                    if (_loopBlendDuration > 0f)
+                    _effectiveLoopDuration = animLength;
+                    if (_audioSource != null && _audioSource.clip != null)
                     {
-                        _animator.CrossFade(stateInfo.shortNameHash, _loopBlendDuration, 0, 0f);
+                        float audioEffective = _audioSource.clip.length + _audioOffset;
+                        _effectiveLoopDuration = Mathf.Min(animLength, audioEffective);
+                        _effectiveLoopDuration = Mathf.Max(_effectiveLoopDuration, 0.5f);
+                        Debug.Log($"[HandAnimationPlayer] Loop duration: {_effectiveLoopDuration:F2}s " +
+                                  $"(anim={animLength:F2}s, audio={_audioSource.clip.length:F2}s, offset={_audioOffset:F2}s)");
+                    }
+                    else if (_partnerPlayer != null && _partnerPlayer.HasLoopDurationResolved
+                             && _partnerPlayer.EffectiveLoopDuration > 0f)
+                    {
+                        // No audio on this player — adopt partner's loop duration
+                        _effectiveLoopDuration = Mathf.Min(animLength, _partnerPlayer.EffectiveLoopDuration);
+                        _effectiveLoopDuration = Mathf.Max(_effectiveLoopDuration, 0.5f);
+                        Debug.Log($"[HandAnimationPlayer] Loop duration (from partner): {_effectiveLoopDuration:F2}s " +
+                                  $"(own anim={animLength:F2}s, partner={_partnerPlayer.EffectiveLoopDuration:F2}s)");
                     }
                     else
                     {
-                        _animator.Play(stateInfo.shortNameHash, 0, 0f);
+                        Debug.Log($"[HandAnimationPlayer] Loop duration: {_effectiveLoopDuration:F2}s (no audio, using anim length)");
                     }
-
-                    // Restart voice audio in sync with the animation loop
-                    RestartAudio();
+                    _loopDurationResolved = true;
                 }
+
+                // If partner hasn't resolved yet but now has, re-check our duration
+                if (_loopDurationResolved && _audioSource == null
+                    && _partnerPlayer != null && _partnerPlayer.HasLoopDurationResolved
+                    && _partnerPlayer.EffectiveLoopDuration > 0f
+                    && _effectiveLoopDuration > _partnerPlayer.EffectiveLoopDuration)
+                {
+                    _effectiveLoopDuration = Mathf.Min(animLength, _partnerPlayer.EffectiveLoopDuration);
+                    _effectiveLoopDuration = Mathf.Max(_effectiveLoopDuration, 0.5f);
+                }
+
+                // Check if we've reached the effective loop point
+                float animTime = stateInfo.normalizedTime * animLength;
+                bool shouldLoop = false;
+
+                if (_effectiveLoopDuration > 0f && animTime >= _effectiveLoopDuration)
+                {
+                    shouldLoop = true;
+                }
+                else if (stateInfo.normalizedTime >= 1.0f)
+                {
+                    shouldLoop = true;
+                }
+
+                // Audio finished before animation (audio shorter)
+                if (!shouldLoop && _audioSource != null && _audioSource.clip != null
+                    && !_audioSource.isPlaying && _loopDurationResolved
+                    && _effectiveLoopDuration < animLength)
+                {
+                    shouldLoop = true;
+                }
+
+                if (shouldLoop)
+                {
+                    // Restart self + partner via Restart()
+                    Restart();
+                }
+            }
+        }
+
+        /// <summary>
+        /// Safeguard: if the XR Origin position jumps by more than 1m in a single frame,
+        /// it was likely displaced by an animation glitch — restore it.
+        /// </summary>
+        private void LateUpdate()
+        {
+            if (_cachedXROrigin == null) return;
+
+            float dist = Vector3.Distance(_cachedXROrigin.position, _lastKnownXROriginPos);
+            if (dist > 1f)
+            {
+                Debug.LogWarning($"[HandAnimationPlayer] XR Origin jumped {dist:F1}m in one frame " +
+                                 $"(from {_lastKnownXROriginPos} to {_cachedXROrigin.position}) — restoring!");
+                _cachedXROrigin.position = _lastKnownXROriginPos;
+                _cachedXROrigin.rotation = _lastKnownXROriginRot;
+            }
+            else
+            {
+                // Track the good position
+                _lastKnownXROriginPos = _cachedXROrigin.position;
+                _lastKnownXROriginRot = _cachedXROrigin.rotation;
             }
         }
 
@@ -382,6 +567,135 @@ namespace FingerPaint
             Debug.Log($"[HandAnimationPlayer] Playback ready: {_handInstance.name} with {_animatorController.name} " +
                       $"(loop={_loop}, animRoot={animRoot.name}, startDelay={_startDelay}s)");
         }
+
+        // ─── XR Origin Protection ────────────────────────────────────────
+
+        /// <summary>
+        /// Find the XR Origin in the scene by searching for common component names.
+        /// </summary>
+        private void CacheXROrigin()
+        {
+            // Try to find by component type name (works across XR SDK versions)
+            string[] xrOriginTypeNames = { "XROrigin", "XRRig", "OVRCameraRig", "TrackedPoseDriver" };
+
+            foreach (var typeName in xrOriginTypeNames)
+            {
+                foreach (var mb in FindObjectsOfType<MonoBehaviour>())
+                {
+                    if (mb != null && mb.GetType().Name == typeName)
+                    {
+                        // For TrackedPoseDriver, use its parent (the XR Origin root)
+                        _cachedXROrigin = typeName == "TrackedPoseDriver"
+                            ? mb.transform.root
+                            : mb.transform;
+
+                        _lastKnownXROriginPos = _cachedXROrigin.position;
+                        _lastKnownXROriginRot = _cachedXROrigin.rotation;
+                        Debug.Log($"[HandAnimationPlayer] Cached XR Origin: \"{_cachedXROrigin.name}\" " +
+                                  $"(found via {typeName}) at {_lastKnownXROriginPos}");
+                        return;
+                    }
+                }
+            }
+
+            // Fallback: search by name
+            var go = GameObject.Find("XR Origin (XR Rig)") ?? GameObject.Find("XR Origin") ?? GameObject.Find("OVRCameraRig");
+            if (go != null)
+            {
+                _cachedXROrigin = go.transform;
+                _lastKnownXROriginPos = _cachedXROrigin.position;
+                _lastKnownXROriginRot = _cachedXROrigin.rotation;
+                Debug.Log($"[HandAnimationPlayer] Cached XR Origin by name: \"{go.name}\" at {_lastKnownXROriginPos}");
+            }
+            else
+            {
+                Debug.LogWarning("[HandAnimationPlayer] Could not find XR Origin — position protection disabled.");
+            }
+        }
+
+        // ─── Debug / Editor Playback Control ─────────────────────────────
+
+        /// <summary>Current animation time in seconds.</summary>
+        public float CurrentTime
+        {
+            get
+            {
+                if (_animator == null || _animator.runtimeAnimatorController == null) return 0f;
+                var info = _animator.GetCurrentAnimatorStateInfo(0);
+                return (info.normalizedTime % 1f) * info.length;
+            }
+        }
+
+        /// <summary>Total animation clip length in seconds.</summary>
+        public float AnimationLength
+        {
+            get
+            {
+                if (_animator == null || _animator.runtimeAnimatorController == null) return 0f;
+                var info = _animator.GetCurrentAnimatorStateInfo(0);
+                return info.length;
+            }
+        }
+
+        /// <summary>Total audio clip length in seconds (0 if no audio).</summary>
+        public float AudioLength => (_audioSource != null && _audioSource.clip != null) ? _audioSource.clip.length : 0f;
+
+        /// <summary>Current audio playback time.</summary>
+        public float AudioTime => (_audioSource != null && _audioSource.isPlaying) ? _audioSource.time : 0f;
+
+        /// <summary>Whether playback has started (past start delay). True even when paused.</summary>
+        public bool IsPlaying => _animator != null && !_playbackStartPending;
+
+        /// <summary>
+        /// Seek both animation and audio to a specific time (seconds).
+        /// Also seeks the partner player.
+        /// </summary>
+        public void SeekTo(float timeInSeconds, bool syncPartner = true)
+        {
+            if (_animator == null || _animator.runtimeAnimatorController == null) return;
+
+            var info = _animator.GetCurrentAnimatorStateInfo(0);
+            float length = info.length;
+            if (length <= 0f) return;
+
+            float normalized = Mathf.Clamp01(timeInSeconds / length);
+            _animator.Play(info.shortNameHash, 0, normalized);
+
+            if (_audioSource != null && _audioSource.clip != null)
+            {
+                float audioTime = Mathf.Clamp(timeInSeconds - _audioOffset, 0f, _audioSource.clip.length);
+                _audioSource.time = audioTime;
+                if (!_audioSource.isPlaying && !_isPaused)
+                    _audioSource.Play();
+            }
+
+            if (syncPartner && _partnerPlayer != null)
+                _partnerPlayer.SeekTo(timeInSeconds, false);
+        }
+
+        /// <summary>
+        /// Set playback speed (1 = normal, 2 = double, etc.)
+        /// Also applies to partner if linked.
+        /// </summary>
+        public void SetPlaybackSpeed(float speed, bool syncPartner = true)
+        {
+            _savedSpeed = speed;
+
+            if (_animator != null && !_isPaused)
+                _animator.speed = speed;
+
+            if (_audioSource != null && _audioSource.clip != null && !_isPaused)
+                _audioSource.pitch = speed;
+
+            if (syncPartner && _partnerPlayer != null)
+                _partnerPlayer.SetPlaybackSpeed(speed, false);
+        }
+
+        /// <summary>Current playback speed (returns saved speed even when paused).</summary>
+        public float PlaybackSpeed => _isPaused ? 0f : (_animator != null ? _animator.speed : 1f);
+
+        /// <summary>Whether playback is currently paused.</summary>
+        public bool IsPaused => _isPaused;
 
         // ─── Helpers ────────────────────────────────────────────────────
 
