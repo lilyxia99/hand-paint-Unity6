@@ -6,11 +6,15 @@ namespace FingerPaint
     /// World-space debug overlay for VoiceDetector — zero external dependencies.
     /// Uses only built-in MeshRenderer (Quads) + TextMesh. No UGUI / Canvas needed.
     /// Floats in front of the player's head so it's visible in VR on Quest.
+    ///
+    /// Toggle gesture: thumb + pinky touch while looking at that palm.
+    /// Panel auto-hides after a configurable timeout.
     /// </summary>
     public class VoiceDebugUI : MonoBehaviour
     {
         [Header("References")]
         [SerializeField] private VoiceDetector _voiceDetector;
+        [SerializeField] private HandTrackingManager _handTracking;
 
         [Header("Positioning")]
         [Tooltip("Distance in front of the camera.")]
@@ -23,6 +27,20 @@ namespace FingerPaint
         [SerializeField] private float _panelWidth = 0.28f;
         [SerializeField] private float _panelHeight = 0.10f;
         [SerializeField] private float _barHeight = 0.018f;
+
+        [Header("Visibility")]
+        [Tooltip("If true, the panel is always visible. If false, requires gesture to toggle.")]
+        [SerializeField] private bool _showByDefault = true;
+
+        [Tooltip("How long the panel stays visible after a gesture toggle (seconds). 0 = stays forever.")]
+        [SerializeField] private float _autoHideDelay = 15f;
+
+        [Header("Toggle Gesture")]
+        [Tooltip("Max distance between thumb tip and pinky tip to count as touching (meters).")]
+        [SerializeField] private float _thumbPinkyTouchDistance = 0.03f;
+
+        [Tooltip("Min dot(cameraForward, toPalm) to count as looking at the palm.")]
+        [SerializeField] private float _gazeDotThreshold = 0.5f;
 
         // Runtime references
         private Transform _root;
@@ -38,12 +56,19 @@ namespace FingerPaint
 
         private Camera _mainCam;
 
+        // Toggle state
+        private bool _isVisible;
+        private float _hideTimer;
+        private bool _gestureWasActive; // for edge detection (show on gesture start, not hold)
+
         // ─── Lifecycle ───────────────────────────────────────────────────
 
         private void Start()
         {
             _mainCam = Camera.main;
+            _isVisible = _showByDefault;
             BuildPanel();
+            SetPanelVisible(_isVisible);
         }
 
         private void LateUpdate()
@@ -51,8 +76,88 @@ namespace FingerPaint
             if (_voiceDetector == null || _mainCam == null)
                 return;
 
+            // Check toggle gesture if not showing by default
+            if (!_showByDefault && _handTracking != null)
+                UpdateToggleGesture();
+
+            // Auto-hide timer
+            if (!_showByDefault && _isVisible && _autoHideDelay > 0f)
+            {
+                _hideTimer -= Time.deltaTime;
+                if (_hideTimer <= 0f)
+                {
+                    _isVisible = false;
+                    SetPanelVisible(false);
+                }
+            }
+
+            if (!_isVisible)
+                return;
+
             FollowHead();
             UpdateVisuals();
+        }
+
+        // ─── Toggle gesture ──────────────────────────────────────────────
+
+        /// <summary>
+        /// Detects thumb + pinky touch while looking at the palm on either hand.
+        /// Toggles panel visibility on gesture start (rising edge).
+        /// </summary>
+        private void UpdateToggleGesture()
+        {
+            bool gestureActive = false;
+
+            // Check both hands
+            for (int h = 0; h < 2; h++)
+            {
+                bool isLeft = h == 0;
+                int offset = isLeft ? 0 : 5;
+
+                // Need both thumb and pinky tracked
+                var thumb = _handTracking.Fingers[offset + 0]; // Thumb
+                var pinky = _handTracking.Fingers[offset + 4]; // Little
+                if (!thumb.IsTracked || !pinky.IsTracked)
+                    continue;
+
+                // Check thumb-pinky distance
+                float dist = Vector3.Distance(thumb.TipPosition, pinky.TipPosition);
+                if (dist > _thumbPinkyTouchDistance)
+                    continue;
+
+                // Check if camera is looking at this palm
+                if (!_handTracking.TryGetPalmPose(isLeft, out Vector3 palmPos, out _))
+                    continue;
+
+                Vector3 camPos = _mainCam.transform.position;
+                Vector3 camFwd = _mainCam.transform.forward;
+                Vector3 toPalm = (palmPos - camPos).normalized;
+                float gazeDot = Vector3.Dot(camFwd, toPalm);
+
+                if (gazeDot >= _gazeDotThreshold)
+                {
+                    gestureActive = true;
+                    break;
+                }
+            }
+
+            // Rising edge: toggle on gesture start only
+            if (gestureActive && !_gestureWasActive)
+            {
+                _isVisible = !_isVisible;
+                SetPanelVisible(_isVisible);
+
+                if (_isVisible)
+                    _hideTimer = _autoHideDelay;
+            }
+
+            _gestureWasActive = gestureActive;
+        }
+
+        private void SetPanelVisible(bool visible)
+        {
+            if (_root != null)
+                _root.gameObject.SetActive(visible);
         }
 
         private void OnDestroy()

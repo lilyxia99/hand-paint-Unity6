@@ -1,7 +1,8 @@
 using UnityEditor;
 using UnityEngine;
+using FingerPaint;
 
-namespace FingerPaint
+namespace FingerPaint.Editor
 {
     /// <summary>
     /// Custom Inspector for HandAnimationPlayer.

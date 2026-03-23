@@ -44,8 +44,13 @@ namespace FingerPaint
 
         // ─── Public API ─────────────────────────────────────────────────
 
+        private float _activeDuration;
+
         /// <summary>Show a message that auto-dismisses after _displayDuration seconds.</summary>
-        public void Show(string message)
+        public void Show(string message) => Show(message, _displayDuration);
+
+        /// <summary>Show a message with a custom duration (seconds).</summary>
+        public void Show(string message, float duration)
         {
             _cam = Camera.main;
 
@@ -55,6 +60,7 @@ namespace FingerPaint
             _messageTMP.text = message;
             _messageTMP.color = _baseColor;
             _showTimer = 0f;
+            _activeDuration = duration;
             _root.gameObject.SetActive(true);
 
             // Snap to position
@@ -104,8 +110,8 @@ namespace FingerPaint
             }
 
             // Fade out in the last 0.5s, then hide
-            float fadeStart = _displayDuration - 0.5f;
-            if (_showTimer >= _displayDuration)
+            float fadeStart = _activeDuration - 0.5f;
+            if (_showTimer >= _activeDuration)
             {
                 _root.gameObject.SetActive(false);
             }

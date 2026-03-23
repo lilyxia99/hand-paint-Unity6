@@ -60,6 +60,34 @@ namespace FingerPaint
                  "Both hands loop together — whichever has audio determines the loop point.")]
         [SerializeField] private HandAnimationPlayer _partnerPlayer;
 
+        [Header("Clear Canvas on Loop")]
+        [Tooltip("When enabled, prompts the player before each loop: save & clear the canvas, or keep sculpting. " +
+                 "Only needs to be on ONE player — if both are checked, only one will show the prompt.")]
+        [SerializeField] private bool _clearCanvasOnLoop = false;
+
+        [Tooltip("How long the prompt stays visible (seconds). The prompt appears this many seconds before the loop ends.")]
+        [SerializeField] [Range(3f, 30f)] private float _clearPromptDuration = 8f;
+
+        [Tooltip("Reference to the FingerPainter to clear. Auto-discovered if empty.")]
+        [SerializeField] private FingerPainter _painter;
+
+        [Tooltip("Reference to MeshExporter for saving before clear. Auto-discovered if empty.")]
+        [SerializeField] private MeshExporter _meshExporter;
+
+        [Tooltip("Reference to HandTrackingManager for thumbs-up detection. Auto-discovered if empty.")]
+        [SerializeField] private HandTrackingManager _handTracking;
+
+        [Tooltip("Reference to ActionFeedbackUI for showing the prompt. Auto-discovered if empty.")]
+        [SerializeField] private ActionFeedbackUI _feedbackUI;
+
+        [Header("Height Follow")]
+        [Tooltip("When enabled, the hand animation follows the player's height changes. " +
+                 "If you stand up, the hands move up too, keeping them at eye level.")]
+        [SerializeField] private bool _followPlayerHeight = false;
+
+        [Tooltip("Smoothing speed for height follow. Higher = snappier.")]
+        [SerializeField] [Range(1f, 20f)] private float _heightFollowSpeed = 8f;
+
         [Header("Material Override")]
         [Tooltip("Optional material to apply to the hand mesh. Leave null for the prefab default.")]
         [SerializeField] private Material _handMaterial;
@@ -80,6 +108,17 @@ namespace FingerPaint
         private Quaternion _lastKnownXROriginRot;
         private float _savedSpeed = 1f; // speed before pausing
         private bool _isPaused;
+
+        // Height follow
+        private Transform _heightCamera;
+        private float _initialCameraY;
+        private float _initialSelfY;
+        private bool _heightBaselineCaptured;
+
+        // Clear canvas on loop
+        private bool _clearPromptShown;
+        private bool _keepSculptingChosen;
+        private bool _isClearCanvasOwner; // only one player handles the prompt
 
         // ─── Public API ─────────────────────────────────────────────────
 
@@ -230,6 +269,9 @@ namespace FingerPaint
             // Parse subtitle file if assigned
             if (_subtitleFile != null)
                 _subtitleEntries = SrtParser.Parse(_subtitleFile.text);
+
+            // Auto-discover clear canvas references
+            SetupClearCanvasOnLoop();
         }
 
         private void Update()
@@ -265,9 +307,16 @@ namespace FingerPaint
                 }
 
                 _playbackStartPending = false;
+
+                // Capture height baseline now that the player is settled in
+                CaptureHeightBaseline();
+
                 Debug.Log($"[HandAnimationPlayer] Playback started after {_startDelay}s delay (audioOffset={_audioOffset:F2}s)");
                 return;
             }
+
+            // ── Height follow ──────────────────────────────────────────────
+            UpdateHeightFollow();
 
             // ── Runtime audio offset correction ──────────────────────────
             // If the user adjusts _audioOffset in the Inspector at runtime,
@@ -374,8 +423,25 @@ namespace FingerPaint
                     shouldLoop = true;
                 }
 
+                // ── Clear canvas prompt (shown before loop end) ───────────
+                if (_isClearCanvasOwner && _loopDurationResolved && _effectiveLoopDuration > 0f)
+                {
+                    float timeLeft = _effectiveLoopDuration - animTime;
+                    UpdateClearCanvasPrompt(timeLeft, shouldLoop);
+                }
+
                 if (shouldLoop)
                 {
+                    // If clear canvas is active and user didn't keep, save & clear
+                    if (_isClearCanvasOwner && _clearCanvasOnLoop && !_keepSculptingChosen)
+                    {
+                        PerformSaveAndClear();
+                    }
+
+                    // Reset prompt state for next loop
+                    _clearPromptShown = false;
+                    _keepSculptingChosen = false;
+
                     // Restart self + partner via Restart()
                     Restart();
                 }
@@ -566,6 +632,174 @@ namespace FingerPaint
 
             Debug.Log($"[HandAnimationPlayer] Playback ready: {_handInstance.name} with {_animatorController.name} " +
                       $"(loop={_loop}, animRoot={animRoot.name}, startDelay={_startDelay}s)");
+        }
+
+        // ─── Clear Canvas on Loop ────────────────────────────────────────
+
+        private void SetupClearCanvasOnLoop()
+        {
+            if (!_clearCanvasOnLoop) return;
+
+            // Determine ownership: only one player shows the prompt
+            // If partner also has it enabled, the one with audio owns it;
+            // if neither has audio, the first one (this) owns it.
+            if (_partnerPlayer != null && _partnerPlayer._clearCanvasOnLoop)
+            {
+                // I have audio → I'm the owner
+                if (_voiceClip != null)
+                {
+                    _isClearCanvasOwner = true;
+                }
+                // Partner has audio → they're the owner
+                else if (_partnerPlayer._voiceClip != null)
+                {
+                    _isClearCanvasOwner = false;
+                }
+                // Neither has audio → use instance ID as tiebreaker
+                else
+                {
+                    _isClearCanvasOwner = GetInstanceID() < _partnerPlayer.GetInstanceID();
+                }
+            }
+            else
+            {
+                _isClearCanvasOwner = true;
+            }
+
+            if (!_isClearCanvasOwner) return;
+
+            // Auto-discover references
+            if (_painter == null)
+                _painter = FindObjectOfType<FingerPainter>();
+            if (_meshExporter == null)
+                _meshExporter = FindObjectOfType<MeshExporter>();
+            if (_handTracking == null)
+                _handTracking = FindObjectOfType<HandTrackingManager>();
+            if (_feedbackUI == null)
+                _feedbackUI = FindObjectOfType<ActionFeedbackUI>();
+
+            if (_painter == null)
+                Debug.LogWarning("[HandAnimationPlayer] ClearCanvasOnLoop: no FingerPainter found!");
+            if (_feedbackUI == null)
+                Debug.LogWarning("[HandAnimationPlayer] ClearCanvasOnLoop: no ActionFeedbackUI found!");
+
+            Debug.Log($"[HandAnimationPlayer] Clear canvas on loop: owner={_isClearCanvasOwner}, " +
+                      $"leadTime={_clearPromptDuration}s");
+        }
+
+        /// <summary>
+        /// Shows the prompt when approaching the loop end, checks for thumbs-up to cancel.
+        /// </summary>
+        private void UpdateClearCanvasPrompt(float timeLeft, bool isAtLoopEnd)
+        {
+            if (!_clearCanvasOnLoop) return;
+
+            // Show prompt when we're within the lead time
+            if (timeLeft <= _clearPromptDuration && timeLeft > 0f && !_clearPromptShown)
+            {
+                _clearPromptShown = true;
+                _keepSculptingChosen = false;
+
+                if (_feedbackUI != null)
+                    _feedbackUI.Show("Keep sculpting? Thumbs up = Keep", _clearPromptDuration);
+
+                Debug.Log("[HandAnimationPlayer] Clear canvas prompt shown.");
+            }
+
+            // While prompt is shown, check for thumbs-up on either hand
+            if (_clearPromptShown && !_keepSculptingChosen && _handTracking != null)
+            {
+                bool thumbsUp = _handTracking.IsThumbsUp(true) || _handTracking.IsThumbsUp(false);
+                if (thumbsUp)
+                {
+                    _keepSculptingChosen = true;
+
+                    if (_feedbackUI != null)
+                        _feedbackUI.Show("Keeping your work!");
+
+                    Debug.Log("[HandAnimationPlayer] User chose to keep sculpting.");
+                }
+            }
+        }
+
+        private void PerformSaveAndClear()
+        {
+            if (_painter == null) return;
+
+            int securedCount = _painter.TotalPointCount;
+
+            if (securedCount == 0)
+            {
+                // Nothing secured — no save, no clear needed
+                Debug.Log("[HandAnimationPlayer] No secured spheres — skipping save & clear.");
+                return;
+            }
+
+            // Save first, then clear
+            if (_meshExporter != null)
+            {
+                _meshExporter.Export();
+                Debug.Log($"[HandAnimationPlayer] Saved {securedCount} points before clear.");
+
+                if (_feedbackUI != null)
+                    _feedbackUI.Show("Saved & Clearing");
+            }
+            else if (_feedbackUI != null)
+            {
+                _feedbackUI.Show("Clearing canvas");
+            }
+
+            _painter.ClearAll();
+            Debug.Log("[HandAnimationPlayer] Canvas cleared on loop.");
+        }
+
+        // ─── Height Follow ───────────────────────────────────────────────
+
+        /// <summary>
+        /// Captures the camera's current Y position as the baseline.
+        /// Future height changes are measured as deltas from this.
+        /// </summary>
+        private void CaptureHeightBaseline()
+        {
+            if (!_followPlayerHeight) return;
+
+            _heightCamera = Camera.main != null ? Camera.main.transform : null;
+            if (_heightCamera == null)
+            {
+                foreach (var cam in FindObjectsOfType<Camera>())
+                {
+                    if (cam.isActiveAndEnabled)
+                    {
+                        _heightCamera = cam.transform;
+                        break;
+                    }
+                }
+            }
+
+            if (_heightCamera != null)
+            {
+                _initialCameraY = _heightCamera.position.y;
+                _initialSelfY = transform.position.y;
+                _heightBaselineCaptured = true;
+                Debug.Log($"[HandAnimationPlayer] Height baseline captured: cameraY={_initialCameraY:F3}, selfY={_initialSelfY:F3}");
+            }
+        }
+
+        /// <summary>
+        /// Smoothly offsets this transform's Y position based on the delta
+        /// between the camera's current height and the baseline height.
+        /// </summary>
+        private void UpdateHeightFollow()
+        {
+            if (!_followPlayerHeight || !_heightBaselineCaptured || _heightCamera == null)
+                return;
+
+            float cameraHeightDelta = _heightCamera.position.y - _initialCameraY;
+            float targetY = _initialSelfY + cameraHeightDelta;
+
+            Vector3 pos = transform.position;
+            pos.y = Mathf.Lerp(pos.y, targetY, _heightFollowSpeed * Time.deltaTime);
+            transform.position = pos;
         }
 
         // ─── XR Origin Protection ────────────────────────────────────────
