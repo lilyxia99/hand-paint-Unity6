@@ -11,7 +11,10 @@
       "Bash(done)",
       "Bash(ls -la 'C:\\\\Users\\\\l_xia\\\\Documents\\\\DEVELOPER\\\\hand-paint\\\\My project\\\\Assets\\\\Scripts\\\\FingerPaint\\\\HandAnimation'*)",
       "Bash(xargs grep -l \"Microphone\\\\|AudioClip\\\\|AudioSource\\\\|recording\\\\|mic\")",
-      "Bash(xargs grep:*)"
+      "Bash(xargs grep:*)",
+      "Bash(grep -rn \"FindObjectsByType\\\\|FindAnyObjectByType\\\\|FindFirstObjectByType\" Assets/Scripts/FingerPaint/*.cs)",
+      "Bash(grep -rn .positions*= 'C:\\\\Users\\\\l_xia\\\\Documents\\\\DEVELOPER\\\\hand-paint\\\\My project\\\\Assets\\\\Scripts' --include=*.cs)",
+      "Bash(grep -rn \"SetParent\\\\|parent\\\\s*=\" 'C:\\\\Users\\\\l_xia\\\\Documents\\\\DEVELOPER\\\\hand-paint\\\\My project\\\\Assets\\\\Scripts' --include=*.cs)"
     ]
   }
 }

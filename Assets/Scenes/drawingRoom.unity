@@ -278,13 +278,21 @@ MonoBehaviour:
   _animatorController: {fileID: 9100000, guid: dd4c856ce6f51c64aab0d53d3f5e9e3f, type: 2}
   _loop: 1
   _loopBlendDuration: 0.5
-  _voiceClip: {fileID: 8300000, guid: c8b52d88148e3d9409a7a0b5b26f9383, type: 3}
+  _voiceClip: {fileID: 8300000, guid: 928b9940d16f32e438a48da52f8ae25a, type: 3}
   _voiceVolume: 1
   _startDelay: 2
   _audioOffset: 0
-  _subtitleFile: {fileID: 4900000, guid: 37e45dff4ed98494cb49dda0cf7e38eb, type: 3}
+  _subtitleFile: {fileID: 4900000, guid: 061038078fcd22a4395a77eb0337beec, type: 3}
   _subtitleDisplay: {fileID: 1195711747}
   _partnerPlayer: {fileID: 2029565118}
+  _clearCanvasOnLoop: 0
+  _clearPromptDuration: 8
+  _painter: {fileID: 0}
+  _meshExporter: {fileID: 0}
+  _handTracking: {fileID: 0}
+  _feedbackUI: {fileID: 0}
+  _followPlayerHeight: 1
+  _heightFollowSpeed: 8
   _handMaterial: {fileID: 2100000, guid: 0a8bae9b1d46f0448980249e69b899ba, type: 2}
 --- !u!4 &165888346
 Transform:
@@ -436,6 +444,10 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
+    - target: {fileID: 1178791450436251564, guid: f6336ac4ac8b4d34bc5072418cdc62a0, type: 3}
+      propertyPath: m_RequestedTrackingOriginMode
+      value: 2
+      objectReference: {fileID: 0}
     - target: {fileID: 1717954561962503725, guid: f6336ac4ac8b4d34bc5072418cdc62a0, type: 3}
       propertyPath: m_Name
       value: XR Origin (XR Rig)
@@ -806,6 +818,7 @@ GameObject:
   - component: {fileID: 799046155}
   - component: {fileID: 799046154}
   - component: {fileID: 799046153}
+  - component: {fileID: 799046156}
   m_Layer: 2
   m_Name: tutorial
   m_TagString: Untagged
@@ -823,7 +836,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: 1, z: -0, w: 0}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 0.13842444, y: 0.045406, z: 0.045406}
+  m_LocalScale: {x: 0.23, y: 0.045406, z: 0.07}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 702354065}
@@ -907,6 +920,22 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 799046151}
   m_Mesh: {fileID: 10209, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!114 &799046156
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 799046151}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: afd9441a4fd42b349bfdafd2ffd82bab, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::FingerPaint.FollowCameraYaw
+  _heightOffset: -1.6
+  _forwardOffset: 0.4
+  _smoothSpeed: 5
+  _faceCamera: 1
 --- !u!1 &939847538
 GameObject:
   m_ObjectHideFlags: 0
@@ -986,7 +1015,7 @@ MonoBehaviour:
   _outerRadius: 5
   _maxParticles: 60
   _emissionRate: 8
-  _driftSpeed: 0.1
+  _driftSpeed: 0.05
   _bobAmplitude: 0.3
   _colorA: {r: 1.6, g: 1.9, b: 2, a: 2}
   _colorB: {r: 2, g: 1.4, b: 0.6, a: 2}
@@ -996,6 +1025,7 @@ MonoBehaviour:
   _bloomIntensity: 2.03
   _bloomThreshold: 0.8
   _pulseSpeed: 1.5
+  _particleShader: {fileID: 4800000, guid: 0406db5a14f94604a8c57ccfbc9f3b46, type: 3}
 --- !u!4 &940629263
 Transform:
   m_ObjectHideFlags: 0
@@ -1708,11 +1738,16 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::FingerPaint.VoiceDebugUI
   _voiceDetector: {fileID: 1774160849}
+  _handTracking: {fileID: 0}
   _distance: 0.6
   _verticalOffset: -1.02
   _panelWidth: 0.28
   _panelHeight: 0.1
   _barHeight: 0.018
+  _showByDefault: 0
+  _autoHideDelay: 15
+  _thumbPinkyTouchDistance: 0.03
+  _gazeDotThreshold: 0.5
 --- !u!1 &1990789199
 GameObject:
   m_ObjectHideFlags: 0
@@ -1787,6 +1822,14 @@ MonoBehaviour:
   _subtitleFile: {fileID: 0}
   _subtitleDisplay: {fileID: 0}
   _partnerPlayer: {fileID: 165888345}
+  _clearCanvasOnLoop: 1
+  _clearPromptDuration: 8
+  _painter: {fileID: 1128206443}
+  _meshExporter: {fileID: 1128206442}
+  _handTracking: {fileID: 1128206444}
+  _feedbackUI: {fileID: 668022996}
+  _followPlayerHeight: 1
+  _heightFollowSpeed: 8
   _handMaterial: {fileID: 2100000, guid: 0a8bae9b1d46f0448980249e69b899ba, type: 2}
 --- !u!4 &2029565119
 Transform:

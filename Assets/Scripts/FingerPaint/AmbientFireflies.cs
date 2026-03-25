@@ -63,6 +63,10 @@ namespace FingerPaint
         [Tooltip("Fireflies pulse (fade in/out) over their lifetime")]
         [SerializeField] private float _pulseSpeed = 1.5f;
 
+        [Header("Shader (Required for Builds)")]
+        [Tooltip("Drag in the URP Particles/Unlit shader here. If left empty, Shader.Find is used (works in Editor only).")]
+        [SerializeField] private Shader _particleShader;
+
         private ParticleSystem _ps;
         private ParticleSystemRenderer _psr;
         private Material _particleMat;
@@ -282,12 +286,20 @@ namespace FingerPaint
         {
             _softCircleTex = GenerateSoftCircleTexture(64);
 
-            // Try URP particle shader first, fall back to built-in
-            Shader shader = Shader.Find("Universal Render Pipeline/Particles/Unlit");
+            // Use assigned shader first, then try Shader.Find as fallback (editor only)
+            Shader shader = _particleShader;
+            if (shader == null)
+                shader = Shader.Find("Universal Render Pipeline/Particles/Unlit");
             if (shader == null)
                 shader = Shader.Find("Particles/Standard Unlit");
             if (shader == null)
                 shader = Shader.Find("Mobile/Particles/Additive");
+
+            if (shader == null)
+            {
+                Debug.LogError("[AmbientFireflies] No particle shader found! Assign the URP Particles/Unlit shader in the Inspector.");
+                return new Material(Shader.Find("Hidden/InternalErrorShader"));
+            }
 
             var mat = new Material(shader);
 

@@ -138,6 +138,16 @@ namespace FingerPaint
         /// </summary>
         public void Restart()
         {
+            // Perform save & clear before restarting (check both self and partner for ownership)
+            if (!_isLoopingFromPartner)
+            {
+                if (_isClearCanvasOwner && _clearCanvasOnLoop && !_keepSculptingChosen)
+                    PerformSaveAndClear();
+                else if (_partnerPlayer != null && _partnerPlayer._isClearCanvasOwner
+                         && _partnerPlayer._clearCanvasOnLoop && !_partnerPlayer._keepSculptingChosen)
+                    _partnerPlayer.PerformSaveAndClear();
+            }
+
             RestartSelf();
             // Also restart partner (without recursion)
             if (_partnerPlayer != null && !_isLoopingFromPartner)
@@ -432,45 +442,18 @@ namespace FingerPaint
 
                 if (shouldLoop)
                 {
-                    // If clear canvas is active and user didn't keep, save & clear
-                    if (_isClearCanvasOwner && _clearCanvasOnLoop && !_keepSculptingChosen)
-                    {
-                        PerformSaveAndClear();
-                    }
-
                     // Reset prompt state for next loop
                     _clearPromptShown = false;
                     _keepSculptingChosen = false;
 
-                    // Restart self + partner via Restart()
+                    // Restart handles save & clear + restart of self + partner
                     Restart();
                 }
             }
         }
 
-        /// <summary>
-        /// Safeguard: if the XR Origin position jumps by more than 1m in a single frame,
-        /// it was likely displaced by an animation glitch — restore it.
-        /// </summary>
-        private void LateUpdate()
-        {
-            if (_cachedXROrigin == null) return;
-
-            float dist = Vector3.Distance(_cachedXROrigin.position, _lastKnownXROriginPos);
-            if (dist > 1f)
-            {
-                Debug.LogWarning($"[HandAnimationPlayer] XR Origin jumped {dist:F1}m in one frame " +
-                                 $"(from {_lastKnownXROriginPos} to {_cachedXROrigin.position}) — restoring!");
-                _cachedXROrigin.position = _lastKnownXROriginPos;
-                _cachedXROrigin.rotation = _lastKnownXROriginRot;
-            }
-            else
-            {
-                // Track the good position
-                _lastKnownXROriginPos = _cachedXROrigin.position;
-                _lastKnownXROriginRot = _cachedXROrigin.rotation;
-            }
-        }
+        // LateUpdate XR Origin protection removed — it fights XR tracking.
+        // Protection is only applied inside RestartSelf() around _animator.Play().
 
         private void OnDestroy()
         {
@@ -701,7 +684,7 @@ namespace FingerPaint
                 _keepSculptingChosen = false;
 
                 if (_feedbackUI != null)
-                    _feedbackUI.Show("Keep sculpting? Thumbs up = Keep", _clearPromptDuration);
+                    _feedbackUI.Show("Keep sculpting? Thumbs up to keep working on it", _clearPromptDuration);
 
                 Debug.Log("[HandAnimationPlayer] Clear canvas prompt shown.");
             }

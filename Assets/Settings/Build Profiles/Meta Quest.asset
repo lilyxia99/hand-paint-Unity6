@@ -167,10 +167,16 @@ MonoBehaviour:
     - line: '|   loadStoreDebugModeEnabled: 0'
     - line: '|   visionOSBundleVersion: 1.0'
     - line: '|   tvOSBundleVersion: 1.0'
-    - line: '|   bundleVersion: 9.2.1'
+    - line: '|   bundleVersion: 9.2.2'
     - line: '|   preloadedAssets:'
     - line: '|   - {fileID: 11400000, guid: d232a279f47394c44aff95b839f7c88e, type:
         2}'
+    - line: '|   - {fileID: 11400000, guid: 908d62378b8205449861e5838a18a596, type:
+        2}'
+    - line: '|   - {fileID: 4226981303226134123, guid: b716680a41c7a094fa3b7fb9a8024a67,
+        type: 2}'
+    - line: '|   - {fileID: 9030113687040111788, guid: 4b3de149e50ea0c4f8ad04c79b9f12ec,
+        type: 2}'
     - line: '|   metroInputSource: 0'
     - line: '|   wsaTransparentSwapchain: 0'
     - line: '|   m_HolographicPauseOnTrackingLoss: 1'
@@ -1083,7 +1089,7 @@ MonoBehaviour:
         m_BuildSubtarget: 0
         m_BuildSystem: 1
         m_ExportAsGoogleAndroidProject: 0
-        m_DebugSymbolLevel: 4
+        m_DebugSymbolLevel: 1
         m_DebugSymbolFormat: 5
         m_CurrentDeploymentTargetId: __builtin__target_default
         m_BuildType: 1
