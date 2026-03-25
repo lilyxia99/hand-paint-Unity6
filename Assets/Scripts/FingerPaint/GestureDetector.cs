@@ -19,6 +19,9 @@ namespace FingerPaint
         [SerializeField] private float _holdDuration = 1.0f;   // seconds to hold before trigger
         [SerializeField] private float _cooldown = 3.0f;        // seconds between triggers
 
+        [Header("Messages")]
+        [SerializeField] [TextArea(1, 3)] private string _savedMessage = "\u2713 Saved!";
+
         [Header("Events")]
         public UnityEvent OnSaveGestureDetected;
 
@@ -75,7 +78,7 @@ namespace FingerPaint
                 _exporter.Export();
 
             if (_feedbackUI != null)
-                _feedbackUI.Show("\u2713 Saved!");
+                _feedbackUI.Show(_savedMessage);
 
             OnSaveGestureDetected?.Invoke();
         }

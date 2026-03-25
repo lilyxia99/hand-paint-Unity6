@@ -29,6 +29,9 @@ namespace FingerPaint
         [Tooltip("Cooldown after a clear or cancel (seconds).")]
         [SerializeField] private float _cooldown = 2.0f;
 
+        [Header("Messages")]
+        [SerializeField] [TextArea(1, 3)] private string _clearedMessage = "\u2713 Cleared!";
+
         [Header("Confirmation")]
         [Tooltip("Time before the confirmation auto-cancels (seconds).")]
         [SerializeField] private float _confirmationTimeout = 5.0f;
@@ -206,7 +209,7 @@ namespace FingerPaint
                 _painter.ClearAll();
 
             if (_feedbackUI != null)
-                _feedbackUI.Show("\u2713 Cleared!");
+                _feedbackUI.Show(_clearedMessage);
         }
     }
 }

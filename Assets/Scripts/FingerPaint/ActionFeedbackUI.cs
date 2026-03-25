@@ -19,6 +19,9 @@ namespace FingerPaint
         [Tooltip("Optional TMP font asset. Leave empty for the default TMP font.")]
         [SerializeField] private TMP_FontAsset _font;
 
+        [Tooltip("Font size for the feedback message.")]
+        [SerializeField] private float _fontSize = 42f;
+
         [SerializeField] private Color _baseColor = new Color(0.5f, 1f, 0.6f);
 
         [Header("Glow (TMP Shader)")]
@@ -140,7 +143,7 @@ namespace FingerPaint
             var cfg = TMPTextFactory.Config.Default;
             cfg.Name = "FeedbackText";
             cfg.Parent = _root;
-            cfg.FontSize = 42f;
+            cfg.FontSize = _fontSize;
             cfg.Color = _baseColor;
             cfg.LocalScale = 0.006f;
             cfg.RectSize = new Vector2(400f, 80f);

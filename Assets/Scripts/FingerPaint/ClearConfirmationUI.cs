@@ -19,6 +19,10 @@ namespace FingerPaint
         [Tooltip("Optional TMP font asset. Leave empty for the default TMP font.")]
         [SerializeField] private TMP_FontAsset _font;
 
+        [Header("Messages")]
+        [SerializeField] [TextArea(1, 3)] private string _confirmMessage = "Really cleaning?";
+        [SerializeField] [TextArea(1, 3)] private string _instructionMessage = "Thumbs up = YES    Wait = Cancel";
+
         [Header("Glow (TMP Shader)")]
         [Tooltip("Enable the TMP SDF shader glow effect.")]
         [SerializeField] private bool _enableGlow = true;
@@ -178,7 +182,7 @@ namespace FingerPaint
 
             var msgResult = TMPTextFactory.Create(msgCfg);
             _messageTMP = msgResult.TMP;
-            _messageTMP.text = "Really cleaning?";
+            _messageTMP.text = _confirmMessage;
 
             // Instruction text
             var instCfg = TMPTextFactory.Config.Default;
@@ -197,7 +201,7 @@ namespace FingerPaint
 
             var instResult = TMPTextFactory.Create(instCfg);
             _instructionTMP = instResult.TMP;
-            _instructionTMP.text = "Thumbs up = YES    Wait = Cancel";
+            _instructionTMP.text = _instructionMessage;
 
             // Timer bar fill (no background — just the bar itself)
             float barY = -0.035f;

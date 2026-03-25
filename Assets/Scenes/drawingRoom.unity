@@ -204,6 +204,17 @@ MonoBehaviour:
   _textScale: 0.004
   _leftLabel: Gallery
   _rightLabel: Clear
+  _leftSubLabel: "Hold thumb + middle finger \nLeft hand\ndo it when you can see
+    this text"
+  _rightSubLabel: 'Hold thumb + middle finger
+
+    Right hand
+
+    do it when you
+    can see this text'
+  _labelFontSize: 48
+  _subLabelFontSize: 28
+  _subLabelYOffset: -10
   _font: {fileID: 11400000, guid: ef4f0b7f64e96994ba863a530ce59c6f, type: 2}
   _enableGlow: 1
   _sdfGlowShader: {fileID: 4800000, guid: 68e6db2ebdc24f95958faec2be5558d6, type: 3}
@@ -287,6 +298,10 @@ MonoBehaviour:
   _partnerPlayer: {fileID: 2029565118}
   _clearCanvasOnLoop: 0
   _clearPromptDuration: 8
+  _keepSculptingPrompt: Keep sculpting? Thumbs up to keep working on it
+  _keepingWorkMessage: Keeping your work!
+  _savedAndClearingMessage: Saved & Clearing
+  _clearingCanvasMessage: Clearing canvas
   _painter: {fileID: 0}
   _meshExporter: {fileID: 0}
   _handTracking: {fileID: 0}
@@ -507,6 +522,63 @@ PrefabInstance:
       addedObject: {fileID: 799046152}
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: f6336ac4ac8b4d34bc5072418cdc62a0, type: 3}
+--- !u!1 &474994757
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 474994758}
+  - component: {fileID: 474994759}
+  m_Layer: 0
+  m_Name: ActionFeedbackUI
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &474994758
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 474994757}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0.61401, y: -0.79486, z: 0.77148}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 667759494}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &474994759
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 474994757}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c22ff6bb7e875974fbf6ced067633a38, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::FingerPaint.ActionFeedbackUI
+  _displayDuration: 2
+  _distance: 0.5
+  _verticalOffset: 0.05
+  _font: {fileID: 11400000, guid: ef4f0b7f64e96994ba863a530ce59c6f, type: 2}
+  _fontSize: 42
+  _baseColor: {r: 0.5, g: 1, b: 0.6, a: 1}
+  _enableGlow: 1
+  _sdfGlowShader: {fileID: 4800000, guid: fe393ace9b354375a9cb14cdbbc28be4, type: 3}
+  _glowColor: {r: 0.5, g: 1, b: 0.6, a: 0.5}
+  _glowOffset: 0
+  _glowInner: 0.15
+  _glowOuter: 0.35
+  _glowPower: 0.6
 --- !u!1 &529145834
 GameObject:
   m_ObjectHideFlags: 0
@@ -584,6 +656,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 667759494}
+  - component: {fileID: 667759495}
   m_Layer: 0
   m_Name: UI
   m_TagString: Untagged
@@ -605,9 +678,35 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 20724436}
+  - {fileID: 474994758}
   - {fileID: 668022995}
   m_Father: {fileID: 529145835}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &667759495
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 667759493}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c22ff6bb7e875974fbf6ced067633a38, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::FingerPaint.ActionFeedbackUI
+  _displayDuration: 2
+  _distance: 0.5
+  _verticalOffset: 0.05
+  _font: {fileID: 0}
+  _fontSize: 42
+  _baseColor: {r: 0.5, g: 1, b: 0.6, a: 1}
+  _enableGlow: 1
+  _sdfGlowShader: {fileID: 0}
+  _glowColor: {r: 0.5, g: 1, b: 0.6, a: 0.5}
+  _glowOffset: 0
+  _glowInner: 0.15
+  _glowOuter: 0.35
+  _glowPower: 0.6
 --- !u!1 &668022992
 GameObject:
   m_ObjectHideFlags: 0
@@ -647,6 +746,9 @@ MonoBehaviour:
   _hintDistance: 0.6
   _hintVerticalOffset: -0.14
   _font: {fileID: 11400000, guid: ef4f0b7f64e96994ba863a530ce59c6f, type: 2}
+  _noWorksMessage: No saved works yet
+  _galleryHintMessage: "Look at left palm\n hold thumb and middle finger together
+    to exit"
   _enableGlow: 1
   _sdfGlowShader: {fileID: 4800000, guid: 68e6db2ebdc24f95958faec2be5558d6, type: 3}
   _glowColor: {r: 0.86499566, g: 0.7803044, b: 0.990566, a: 0.5}
@@ -697,6 +799,7 @@ MonoBehaviour:
   _distance: 0.5
   _verticalOffset: 0.05
   _font: {fileID: 11400000, guid: ef4f0b7f64e96994ba863a530ce59c6f, type: 2}
+  _fontSize: 42
   _baseColor: {r: 0.5, g: 1, b: 0.6, a: 1}
   _enableGlow: 1
   _sdfGlowShader: {fileID: 4800000, guid: 68e6db2ebdc24f95958faec2be5558d6, type: 3}
@@ -1080,6 +1183,7 @@ MonoBehaviour:
   _feedbackUI: {fileID: 668022996}
   _holdDuration: 1
   _cooldown: 3
+  _savedMessage: Saved!
   OnSaveGestureDetected:
     m_PersistentCalls:
       m_Calls: []
@@ -1171,6 +1275,7 @@ MonoBehaviour:
     m_RotationOrder: 4
   _tempBallColor: {r: 0.6, g: 0.6, b: 0.8, a: 1}
   _tempBallOpacity: 0.076
+  _maxPermanentSpheres: 2000
   _idleFadeDelay: 1
   _idleFadeCount: 5
   _trailFadeDuration: 1.5
@@ -1591,6 +1696,7 @@ MonoBehaviour:
   _palmFacingDotThreshold: 0.4
   _holdDuration: 0.5
   _cooldown: 2
+  _clearedMessage: Cleared!
   _confirmationTimeout: 5
 --- !u!114 &1582015691
 MonoBehaviour:
@@ -1607,9 +1713,11 @@ MonoBehaviour:
   _panelWidth: 0.35
   _distance: 0.5
   _verticalOffset: 0.05
-  _font: {fileID: 0}
+  _font: {fileID: 11400000, guid: ef4f0b7f64e96994ba863a530ce59c6f, type: 2}
+  _confirmMessage: Clear everything?
+  _instructionMessage: Thumbs up = YES    Wait = Cancel
   _enableGlow: 1
-  _sdfGlowShader: {fileID: 0}
+  _sdfGlowShader: {fileID: 4800000, guid: dd89cf5b9246416f84610a006f916af7, type: 3}
   _glowColor: {r: 1, g: 0.85, b: 0.7, a: 0.5}
   _glowOffset: 0
   _glowInner: 0.15
@@ -1663,8 +1771,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::FingerPaint.VoiceDetector
   _sampleRate: 16000
   _clipLengthSeconds: 1
-  _activationThreshold: 0.002
-  _deactivationThreshold: 0.002
+  _activationThreshold: 0.005
+  _deactivationThreshold: 0.005
   _smoothingFactor: 0.15
   _minSizeMultiplier: 1
   _maxSizeMultiplier: 100
@@ -1739,6 +1847,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::FingerPaint.VoiceDebugUI
   _voiceDetector: {fileID: 1774160849}
   _handTracking: {fileID: 0}
+  _fingerPainter: {fileID: 0}
   _distance: 0.6
   _verticalOffset: -1.02
   _panelWidth: 0.28
@@ -1824,6 +1933,10 @@ MonoBehaviour:
   _partnerPlayer: {fileID: 165888345}
   _clearCanvasOnLoop: 1
   _clearPromptDuration: 8
+  _keepSculptingPrompt: Keep sculpting? Thumbs up to keep working on it
+  _keepingWorkMessage: Keeping your work!
+  _savedAndClearingMessage: Saved & Clearing
+  _clearingCanvasMessage: Clearing canvas
   _painter: {fileID: 1128206443}
   _meshExporter: {fileID: 1128206442}
   _handTracking: {fileID: 1128206444}

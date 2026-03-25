@@ -68,6 +68,12 @@ namespace FingerPaint
         [Tooltip("How long the prompt stays visible (seconds). The prompt appears this many seconds before the loop ends.")]
         [SerializeField] [Range(3f, 30f)] private float _clearPromptDuration = 8f;
 
+        [Header("Clear Canvas Messages")]
+        [SerializeField] [TextArea(1, 3)] private string _keepSculptingPrompt = "Keep sculpting? Thumbs up to keep working on it";
+        [SerializeField] [TextArea(1, 3)] private string _keepingWorkMessage = "Keeping your work!";
+        [SerializeField] [TextArea(1, 3)] private string _savedAndClearingMessage = "Saved & Clearing";
+        [SerializeField] [TextArea(1, 3)] private string _clearingCanvasMessage = "Clearing canvas";
+
         [Tooltip("Reference to the FingerPainter to clear. Auto-discovered if empty.")]
         [SerializeField] private FingerPainter _painter;
 
@@ -684,7 +690,7 @@ namespace FingerPaint
                 _keepSculptingChosen = false;
 
                 if (_feedbackUI != null)
-                    _feedbackUI.Show("Keep sculpting? Thumbs up to keep working on it", _clearPromptDuration);
+                    _feedbackUI.Show(_keepSculptingPrompt, _clearPromptDuration);
 
                 Debug.Log("[HandAnimationPlayer] Clear canvas prompt shown.");
             }
@@ -698,7 +704,7 @@ namespace FingerPaint
                     _keepSculptingChosen = true;
 
                     if (_feedbackUI != null)
-                        _feedbackUI.Show("Keeping your work!");
+                        _feedbackUI.Show(_keepingWorkMessage);
 
                     Debug.Log("[HandAnimationPlayer] User chose to keep sculpting.");
                 }
@@ -725,11 +731,11 @@ namespace FingerPaint
                 Debug.Log($"[HandAnimationPlayer] Saved {securedCount} points before clear.");
 
                 if (_feedbackUI != null)
-                    _feedbackUI.Show("Saved & Clearing");
+                    _feedbackUI.Show(_savedAndClearingMessage);
             }
             else if (_feedbackUI != null)
             {
-                _feedbackUI.Show("Clearing canvas");
+                _feedbackUI.Show(_clearingCanvasMessage);
             }
 
             _painter.ClearAll();

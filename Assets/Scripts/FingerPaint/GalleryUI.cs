@@ -35,6 +35,10 @@ namespace FingerPaint
         [Tooltip("Optional TMP font asset. Leave empty for the default TMP font.")]
         [SerializeField] private TMP_FontAsset _font;
 
+        [Header("Messages")]
+        [SerializeField] [TextArea(1, 5)] private string _noWorksMessage = "No saved works yet";
+        [SerializeField] [TextArea(1, 5)] private string _galleryHintMessage = "Look at left palm + pinch to exit gallery";
+
         [Header("Glow (TMP Shader)")]
         [Tooltip("Enable the TMP SDF shader glow effect.")]
         [SerializeField] private bool _enableGlow = true;
@@ -81,7 +85,7 @@ namespace FingerPaint
             if (count == 0)
             {
                 Debug.Log("[GalleryUI] No saved works to display.");
-                ShowHint("No saved works yet");
+                ShowHint(_noWorksMessage);
                 return;
             }
 
@@ -143,7 +147,7 @@ namespace FingerPaint
                 CreateLabel(entry, i, worldPos);
             }
 
-            ShowHint("Look at left palm + pinch to exit gallery");
+            ShowHint(_galleryHintMessage);
             Debug.Log($"[GalleryUI] Showing {_spawnedObjects.Count} gallery works.");
         }
 
