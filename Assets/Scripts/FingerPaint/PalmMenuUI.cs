@@ -30,6 +30,20 @@ namespace FingerPaint
         [SerializeField] private string _leftLabel = "Gallery";
         [SerializeField] private string _rightLabel = "Clear";
 
+        [Header("Sub-Labels")]
+        [Tooltip("Small text displayed below the left label.")]
+        [SerializeField] [TextArea(1, 3)] private string _leftSubLabel = "";
+        [Tooltip("Small text displayed below the right label.")]
+        [SerializeField] [TextArea(1, 3)] private string _rightSubLabel = "";
+
+        [Header("Font Sizes")]
+        [Tooltip("Font size for the main labels (Gallery / Clear).")]
+        [SerializeField] private float _labelFontSize = 48f;
+        [Tooltip("Font size for the sub-labels.")]
+        [SerializeField] private float _subLabelFontSize = 28f;
+        [Tooltip("Vertical offset of sub-label below the main label (in local TMP units).")]
+        [SerializeField] private float _subLabelYOffset = -55f;
+
         [Header("Text")]
         [Tooltip("Optional TMP font asset. Leave empty for the default TMP font.")]
         [SerializeField] private TMP_FontAsset _font;
@@ -52,9 +66,11 @@ namespace FingerPaint
 
         // Left palm
         private Transform _leftRoot;
+        private TextMeshPro _leftSubTMP;
 
         // Right palm
         private Transform _rightRoot;
+        private TextMeshPro _rightSubTMP;
 
         // ─── Public state ───────────────────────────────────────────────
 
@@ -69,8 +85,8 @@ namespace FingerPaint
         private void Start()
         {
             _cam = Camera.main;
-            BuildIcon(ref _leftRoot, "PalmIcon_Left", _leftLabel);
-            BuildIcon(ref _rightRoot, "PalmIcon_Right", _rightLabel);
+            BuildIcon(ref _leftRoot, "PalmIcon_Left", _leftLabel, _leftSubLabel, out _leftSubTMP);
+            BuildIcon(ref _rightRoot, "PalmIcon_Right", _rightLabel, _rightSubLabel, out _rightSubTMP);
         }
 
         private void LateUpdate()
@@ -119,16 +135,17 @@ namespace FingerPaint
 
         // ─── Build icons ────────────────────────────────────────────────
 
-        private void BuildIcon(ref Transform root, string name, string label)
+        private void BuildIcon(ref Transform root, string name, string label, string subLabel, out TextMeshPro subTMP)
         {
             var rootGO = new GameObject(name);
             rootGO.transform.SetParent(transform, false);
             root = rootGO.transform;
 
+            // Main label
             var cfg = TMPTextFactory.Config.Default;
             cfg.Name = name + "_Text";
             cfg.Parent = root;
-            cfg.FontSize = 48f;
+            cfg.FontSize = _labelFontSize;
             cfg.Color = Color.white;
             cfg.LocalScale = _textScale;
             cfg.RectSize = new Vector2(200f, 50f);
@@ -139,6 +156,28 @@ namespace FingerPaint
 
             var result = TMPTextFactory.Create(cfg);
             result.TMP.text = label;
+
+            // Sub-label (smaller text below)
+            subTMP = null;
+            if (!string.IsNullOrEmpty(subLabel))
+            {
+                var subCfg = TMPTextFactory.Config.Default;
+                subCfg.Name = name + "_SubText";
+                subCfg.Parent = root;
+                subCfg.FontSize = _subLabelFontSize;
+                subCfg.Color = new Color(0.85f, 0.85f, 0.85f, 0.9f);
+                subCfg.LocalScale = _textScale;
+                subCfg.RectSize = new Vector2(250f, 80f);
+                subCfg.LocalPosition = new Vector3(0f, _subLabelYOffset * _textScale, 0f);
+                subCfg.Font = _font;
+                subCfg.GlowShader = _sdfGlowShader;
+                subCfg.EnableGlow = _enableGlow;
+                subCfg.Glow = GetGlowSettings();
+
+                var subResult = TMPTextFactory.Create(subCfg);
+                subResult.TMP.text = subLabel;
+                subTMP = subResult.TMP;
+            }
 
             // Start hidden
             rootGO.SetActive(false);

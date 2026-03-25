@@ -15,6 +15,7 @@ namespace FingerPaint
         [Header("References")]
         [SerializeField] private VoiceDetector _voiceDetector;
         [SerializeField] private HandTrackingManager _handTracking;
+        [SerializeField] private FingerPainter _fingerPainter;
 
         [Header("Positioning")]
         [Tooltip("Distance in front of the camera.")]
@@ -25,7 +26,7 @@ namespace FingerPaint
 
         [Header("Panel Size (world units)")]
         [SerializeField] private float _panelWidth = 0.28f;
-        [SerializeField] private float _panelHeight = 0.10f;
+        [SerializeField] private float _panelHeight = 0.12f;
         [SerializeField] private float _barHeight = 0.018f;
 
         [Header("Visibility")]
@@ -51,6 +52,7 @@ namespace FingerPaint
         private Transform _activeDot;
         private TextMesh _statusText;
         private TextMesh _valuesText;
+        private TextMesh _sphereCountText;
         private Material _barFillMat;
         private Material _activeDotMat;
 
@@ -66,6 +68,8 @@ namespace FingerPaint
         private void Start()
         {
             _mainCam = Camera.main;
+            if (_fingerPainter == null)
+                _fingerPainter = FindObjectOfType<FingerPainter>();
             _isVisible = _showByDefault;
             BuildPanel();
             SetPanelVisible(_isVisible);
@@ -242,6 +246,14 @@ namespace FingerPaint
             string activeLabel = active ? ">> ACTIVE <<" : "idle";
             _valuesText.text = $"Raw:{raw:F4} Smooth:{smoothed:F4} Size:{sizeMul:F1}x {activeLabel}";
             _valuesText.color = active ? new Color(0.3f, 1f, 0.5f) : new Color(0.7f, 0.7f, 0.7f);
+
+            // Sphere count
+            if (_fingerPainter != null && _sphereCountText != null)
+            {
+                int count = _fingerPainter.TotalPointCount;
+                int temp = _fingerPainter.TemporaryBallCount;
+                _sphereCountText.text = $"Spheres: {count} | Temp: {temp}";
+            }
         }
 
         private void SetBarWidth(Transform bar, float normalized, float maxWidth)
@@ -343,6 +355,19 @@ namespace FingerPaint
             _valuesText.text = "";
             valuesGO.transform.localPosition = new Vector3(
                 -_panelWidth * 0.47f, -_panelHeight * 0.45f, -0.002f);
+
+            // --- Sphere count text (below values) ---
+            var sphereGO = new GameObject("SphereCountText");
+            sphereGO.transform.SetParent(_root, false);
+            _sphereCountText = sphereGO.AddComponent<TextMesh>();
+            _sphereCountText.fontSize = 30;
+            _sphereCountText.characterSize = 0.005f;
+            _sphereCountText.anchor = TextAnchor.UpperLeft;
+            _sphereCountText.alignment = TextAlignment.Left;
+            _sphereCountText.color = new Color(0.9f, 0.75f, 0.3f);
+            _sphereCountText.text = "";
+            sphereGO.transform.localPosition = new Vector3(
+                -_panelWidth * 0.47f, -_panelHeight * 0.55f, -0.002f);
 
             // Initial position
             if (_mainCam != null)

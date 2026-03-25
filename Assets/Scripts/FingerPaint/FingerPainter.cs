@@ -95,6 +95,12 @@ namespace FingerPaint
         [Tooltip("Opacity for temporary (silent) balls.")]
         [SerializeField] [Range(0f, 1f)] private float _tempBallOpacity = 0.25f;
 
+        // ─── Permanent sphere cap ────────────────────────────────────────
+
+        [Header("Permanent Sphere Cap")]
+        [Tooltip("Maximum number of permanent spheres allowed. 0 = unlimited. Oldest are recycled when exceeded.")]
+        [SerializeField] private int _maxPermanentSpheres = 0;
+
         // ─── Idle trail fade settings ──────────────────────────────────
 
         [Header("Idle Trail Fade")]
@@ -114,6 +120,9 @@ namespace FingerPaint
 
         /// <summary>Per-finger list of spawned permanent GameObjects (spheres).</summary>
         public List<GameObject>[] PointsByFinger { get; private set; }
+
+        /// <summary>Global ordered queue of all permanent spheres for recycling oldest first.</summary>
+        private Queue<(int fingerIndex, GameObject go)> _permanentQueue = new Queue<(int, GameObject)>();
 
         private Vector3[] _lastSpawnPos;
         private Material[] _fingerMaterials;
@@ -360,6 +369,25 @@ namespace FingerPaint
             }
 
             PointsByFinger[fingerIndex].Add(go);
+            _permanentQueue.Enqueue((fingerIndex, go));
+
+            // Recycle oldest if over cap
+            if (_maxPermanentSpheres > 0)
+                EnforcePermanentCap();
+        }
+
+        /// <summary>Removes oldest permanent spheres until count is within the cap.</summary>
+        private void EnforcePermanentCap()
+        {
+            while (_permanentQueue.Count > _maxPermanentSpheres && _permanentQueue.Count > 0)
+            {
+                var (fi, oldest) = _permanentQueue.Dequeue();
+                if (oldest != null)
+                {
+                    PointsByFinger[fi].Remove(oldest);
+                    Destroy(oldest);
+                }
+            }
         }
 
         // ─── Temporary ball spawning (DualMode, silent) ─────────────────
@@ -731,6 +759,8 @@ namespace FingerPaint
                 PointsByFinger[i].Clear();
                 _lastSpawnPos[i] = Vector3.positiveInfinity;
             }
+
+            _permanentQueue.Clear();
 
             // Clear trail fade entries
             if (_trailFading != null)
