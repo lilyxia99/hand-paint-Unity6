@@ -359,9 +359,23 @@ namespace FingerPaint
             }
 
             // ── Subtitle update ─────────────────────────────────────────
-            if (_subtitleEntries != null && _subtitleDisplay != null && _audioSource != null)
+            if (_subtitleEntries != null && _subtitleDisplay != null)
             {
-                float subTime = _audioSource.isPlaying ? _audioSource.time : -1f;
+                // Derive subtitle time from audio if available, otherwise from animation
+                float subTime = -1f;
+                if (_audioSource != null && (_audioSource.isPlaying || _isPaused))
+                {
+                    subTime = _audioSource.time;
+                }
+                else if (_animator != null && _animator.runtimeAnimatorController != null)
+                {
+                    // Fallback: derive time from animation (works even when audio is between loops)
+                    var si = _animator.GetCurrentAnimatorStateInfo(0);
+                    float len = si.length;
+                    if (len > 0f && !float.IsNaN(len) && !float.IsInfinity(len))
+                        subTime = (si.normalizedTime % 1f) * len;
+                }
+
                 string text = SrtParser.GetTextAtTime(_subtitleEntries, subTime);
                 _subtitleDisplay.SetText(text);
             }
